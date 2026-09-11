@@ -22,7 +22,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "test": "node --test",
+    "test": "rm -rf dist-test && npm run build && tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
     "docs": "typedoc",
     "docs:check": "typedoc --treatWarningsAsErrors",
     "check": "npm run format:check && npm run lint && npm run build && npm test",
