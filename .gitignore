@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-test/
 *.tgz
 docs/api/*
 !docs/api/.gitkeep
