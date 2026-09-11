@@ -20,7 +20,7 @@ export {
 export { compile } from './compiler.js';
 export { find, type FindOk, type FindRejected } from './find.js';
 export { readOverview, readTarget, type ReadResult, type ReadRejection } from './read.js';
-export { toolDefinitions, type ToolDefinition } from './toolschemas.js';
+export { toolDefinitions, toolDefinitionsFor, type ToolDefinition } from './toolschemas.js';
 export type {
   Envelope,
   Rejection,
