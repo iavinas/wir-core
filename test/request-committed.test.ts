@@ -45,11 +45,17 @@ function serve(): Promise<{ server: Server; url: string }> {
   });
 }
 
-async function startSession(url: string, expectedAction: 'RETRIEVE' | 'MUTATE'):
-    Promise<WirSession> {
+async function startSession(
+  url: string,
+  expectedAction: 'RETRIEVE' | 'MUTATE',
+): Promise<WirSession> {
   const session = await WirSession.start({
-    headless: true, expectedAction, storageStatePath: null,
-    harPath: null, tracePath: null, debugScreenshots: false,
+    headless: true,
+    expectedAction,
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
   });
   await session.goto(url);
   return session;
@@ -70,7 +76,10 @@ test('an AJAX submit reads verified request_committed, not bare dom_mutated', as
     const effect = acted['effect'] as { verdict: string; evidence: string };
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     assert.equal(effect.evidence, 'request_committed');
-  } finally { await session.close(); server.close(); }
+  } finally {
+    await session.close();
+    server.close();
+  }
 });
 
 test('a MUTATE finish citing a request_committed act is accepted', async () => {
@@ -81,11 +90,19 @@ test('a MUTATE finish citing a request_committed act is accepted', async () => {
     const effect = acted['effect'] as { verdict: string; evidence: string };
     assert.equal(effect.evidence, 'request_committed', JSON.stringify(acted));
     const finish = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [acted['actRef'] as string],
     });
-    assert.equal(finish['accepted'], true,
-      `the 452 class must be finishable: ${JSON.stringify(finish)}`);
-  } finally { await session.close(); server.close(); }
+    assert.equal(
+      finish['accepted'],
+      true,
+      `the 452 class must be finishable: ${JSON.stringify(finish)}`,
+    );
+  } finally {
+    await session.close();
+    server.close();
+  }
 });
 
 test('a click with local rendering and NO request still reads dom_mutated', async () => {
@@ -97,5 +114,8 @@ test('a click with local rendering and NO request still reads dom_mutated', asyn
     // No candidate request existed — the arm must not mint without one.
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     assert.equal(effect.evidence, 'dom_mutated');
-  } finally { await session.close(); server.close(); }
+  } finally {
+    await session.close();
+    server.close();
+  }
 });

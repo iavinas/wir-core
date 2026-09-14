@@ -18,11 +18,15 @@ import { WirSession } from '../src/session.js';
 
 function fixture(): string {
   const dir = mkdtempSync(join(tmpdir(), 'wir-navstand-'));
-  writeFileSync(join(dir, 'a.html'),
+  writeFileSync(
+    join(dir, 'a.html'),
     '<!doctype html><title>a</title><h1>Order history</h1>' +
-    '<p>Your past orders.</p><a href="b.html">Order 000000180</a>');
-  writeFileSync(join(dir, 'b.html'),
-    '<!doctype html><title>b</title><h1>Order 000000180</h1><p>Status: Pending.</p>');
+      '<p>Your past orders.</p><a href="b.html">Order 000000180</a>',
+  );
+  writeFileSync(
+    join(dir, 'b.html'),
+    '<!doctype html><title>b</title><h1>Order 000000180</h1><p>Status: Pending.</p>',
+  );
   return dir;
 }
 
@@ -37,8 +41,11 @@ async function firstHeadingRef(session: WirSession): Promise<string> {
 test('NAVIGATE finish is refused when every cited ref is from a document left behind', async () => {
   const dir = fixture();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'NAVIGATE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'NAVIGATE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   try {
@@ -54,13 +61,22 @@ test('NAVIGATE finish is refused when every cited ref is from a document left be
     await session.goto(`file://${dir}/a.html`);
 
     const stale = await session.dispatch({
-      verb: 'finish', answer: 'order 000000180', evidenceRefs: [refOnB], status: 'success',
+      verb: 'finish',
+      answer: 'order 000000180',
+      evidenceRefs: [refOnB],
+      status: 'success',
     });
     const rejected = stale['rejected'] as { kind: string; repair?: string } | undefined;
-    assert.equal(rejected?.kind, 'finish_rejected',
-      `a finish whose evidence predates the current document must not pass: ${JSON.stringify(stale).slice(0, 400)}`);
-    assert.match(String(rejected?.repair ?? JSON.stringify(stale)), /standing on/i,
-      'the rejection has to say what to do about it, not just refuse');
+    assert.equal(
+      rejected?.kind,
+      'finish_rejected',
+      `a finish whose evidence predates the current document must not pass: ${JSON.stringify(stale).slice(0, 400)}`,
+    );
+    assert.match(
+      String(rejected?.repair ?? JSON.stringify(stale)),
+      /standing on/i,
+      'the rejection has to say what to do about it, not just refuse',
+    );
   } finally {
     await session.close();
   }
@@ -69,8 +85,11 @@ test('NAVIGATE finish is refused when every cited ref is from a document left be
 test('NAVIGATE finish is accepted while standing on the page it cites', async () => {
   const dir = fixture();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'NAVIGATE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'NAVIGATE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   try {
@@ -80,10 +99,16 @@ test('NAVIGATE finish is accepted while standing on the page it cites', async ()
     const refOnB = await firstHeadingRef(session);
 
     const ok = await session.dispatch({
-      verb: 'finish', answer: 'order 000000180', evidenceRefs: [refOnB], status: 'success',
+      verb: 'finish',
+      answer: 'order 000000180',
+      evidenceRefs: [refOnB],
+      status: 'success',
     });
-    assert.equal(ok['accepted'], true,
-      `evidence from the current document must still pass: ${JSON.stringify(ok).slice(0, 400)}`);
+    assert.equal(
+      ok['accepted'],
+      true,
+      `evidence from the current document must still pass: ${JSON.stringify(ok).slice(0, 400)}`,
+    );
     assert.equal(ok['mode'], 'NAVIGATE');
   } finally {
     await session.close();
@@ -96,8 +121,11 @@ test('NAVIGATE finish is accepted while standing on the page it cites', async ()
 test('RETRIEVE is untouched: evidence from a document left behind still passes', async () => {
   const dir = fixture();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   try {
@@ -107,10 +135,16 @@ test('RETRIEVE is untouched: evidence from a document left behind still passes',
     await session.dispatch({ verb: 'read' });
 
     const ok = await session.dispatch({
-      verb: 'finish', answer: 'Order history', evidenceRefs: [refOnA], status: 'success',
+      verb: 'finish',
+      answer: 'Order history',
+      evidenceRefs: [refOnA],
+      status: 'success',
     });
-    assert.equal(ok['accepted'], true,
-      `RETRIEVE must keep citing pages it has left: ${JSON.stringify(ok).slice(0, 400)}`);
+    assert.equal(
+      ok['accepted'],
+      true,
+      `RETRIEVE must keep citing pages it has left: ${JSON.stringify(ok).slice(0, 400)}`,
+    );
   } finally {
     await session.close();
   }
@@ -123,17 +157,26 @@ test('RETRIEVE is untouched: evidence from a document left behind still passes',
 test('every envelope carries the current url', async () => {
   const dir = fixture();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'NAVIGATE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'NAVIGATE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   try {
     await session.goto(`file://${dir}/b.html`);
     const overview = await session.dispatch({ verb: 'read' });
     const found = await session.dispatch({ verb: 'find', name: 'Order' });
-    for (const [label, res] of [['read', overview], ['find', found]] as const) {
-      assert.match(String(res['url'] ?? ''), /b\.html$/,
-        `${label} must say where the browser is: ${JSON.stringify(res).slice(0, 300)}`);
+    for (const [label, res] of [
+      ['read', overview],
+      ['find', found],
+    ] as const) {
+      assert.match(
+        String(res['url'] ?? ''),
+        /b\.html$/,
+        `${label} must say where the browser is: ${JSON.stringify(res).slice(0, 300)}`,
+      );
     }
   } finally {
     await session.close();
@@ -148,8 +191,11 @@ test('every envelope carries the current url', async () => {
 test('NAVIGATE standing is checked even when the status is not_found_error', async () => {
   const dir = fixture();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'NAVIGATE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'NAVIGATE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   try {
@@ -160,10 +206,16 @@ test('NAVIGATE standing is checked even when the status is not_found_error', asy
     await session.goto(`file://${dir}/a.html`);
 
     const left = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [refOnB], status: 'not_found_error',
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [refOnB],
+      status: 'not_found_error',
     });
-    assert.equal((left['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-      `not_found_error must not smuggle a NAVIGATE finish past the standing check: ${JSON.stringify(left).slice(0, 400)}`);
+    assert.equal(
+      (left['rejected'] as { kind: string } | undefined)?.kind,
+      'finish_rejected',
+      `not_found_error must not smuggle a NAVIGATE finish past the standing check: ${JSON.stringify(left).slice(0, 400)}`,
+    );
   } finally {
     await session.close();
   }
@@ -173,8 +225,11 @@ test('NAVIGATE standing is checked even when the status is not_found_error', asy
 test('RETRIEVE not_found_error is unaffected by the standing check', async () => {
   const dir = fixture();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   try {
@@ -183,7 +238,10 @@ test('RETRIEVE not_found_error is unaffected by the standing check', async () =>
     await session.goto(`file://${dir}/b.html`);
     await session.dispatch({ verb: 'read' });
     const ok = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [refOnA], status: 'not_found_error',
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [refOnA],
+      status: 'not_found_error',
     });
     assert.equal(ok['accepted'], true, JSON.stringify(ok).slice(0, 300));
   } finally {

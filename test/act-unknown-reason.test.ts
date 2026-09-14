@@ -28,7 +28,9 @@ async function startOn(html: string): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-unknown-'));
   writeFileSync(join(dir, 'a.html'), html);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
     debugScreenshots: false,
   });
   await session.goto(`file://${dir}/a.html`);
@@ -52,13 +54,17 @@ test('a click that changes nothing reads unknown WITH the observers it consulted
     const acted = await session.dispatch({ verb: 'act', ref, action: 'click' });
     const effect = effectOf(acted);
     assert.equal(effect.verdict, 'unknown', JSON.stringify(acted));
-    assert.ok(typeof effect.reason === 'string' && effect.reason.length > 0,
-      `an unknown verdict must say why: ${JSON.stringify(acted)}`);
+    assert.ok(
+      typeof effect.reason === 'string' && effect.reason.length > 0,
+      `an unknown verdict must say why: ${JSON.stringify(acted)}`,
+    );
     // The reason names what was armed and what each observer answered.
     assert.match(effect.reason, /no navigation started/, effect.reason);
     assert.match(effect.reason, /document request/, effect.reason);
     assert.match(effect.reason, /mutation records/, effect.reason);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('type that cannot move the window and a key nothing handles both say why', async () => {
@@ -68,14 +74,22 @@ test('type that cannot move the window and a key nothing handles both say why', 
     // Replacing "abc" with "abc": the readable window cannot move.
     const typed = await session.dispatch({ verb: 'act', ref, action: 'type', value: 'abc' });
     assert.equal(effectOf(typed).verdict, 'unknown', JSON.stringify(typed));
-    assert.match(effectOf(typed).reason ?? '', /readable window did not move/,
-      JSON.stringify(typed));
+    assert.match(
+      effectOf(typed).reason ?? '',
+      /readable window did not move/,
+      JSON.stringify(typed),
+    );
     // F7 dispatches cleanly and nothing on this page handles it.
     const keyed = await session.dispatch({ verb: 'act', ref, action: 'key', value: 'F7' });
     assert.equal(effectOf(keyed).verdict, 'unknown', JSON.stringify(keyed));
-    assert.match(effectOf(keyed).reason ?? '', /nothing the target owns moved/,
-      JSON.stringify(keyed));
-  } finally { await session.close(); }
+    assert.match(
+      effectOf(keyed).reason ?? '',
+      /nothing the target owns moved/,
+      JSON.stringify(keyed),
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('a verified verdict carries no reason field — zero new bytes on the paths that work', async () => {
@@ -84,12 +98,23 @@ test('a verified verdict carries no reason field — zero new bytes on the paths
     const box = await refOf(session, { role: 'checkbox' });
     const clicked = await session.dispatch({ verb: 'act', ref: box, action: 'click' });
     assert.equal(effectOf(clicked).verdict, 'verified', JSON.stringify(clicked));
-    assert.ok(!('reason' in (clicked['effect'] as object)),
-      `verified must not grow a reason: ${JSON.stringify(clicked)}`);
+    assert.ok(
+      !('reason' in (clicked['effect'] as object)),
+      `verified must not grow a reason: ${JSON.stringify(clicked)}`,
+    );
     const field = await refOf(session, { role: 'textbox', name: 'Field' });
-    const filled = await session.dispatch({ verb: 'act', ref: field, action: 'fill', value: 'new' });
+    const filled = await session.dispatch({
+      verb: 'act',
+      ref: field,
+      action: 'fill',
+      value: 'new',
+    });
     assert.equal(effectOf(filled).verdict, 'verified', JSON.stringify(filled));
-    assert.ok(!('reason' in (filled['effect'] as object)),
-      `verified must not grow a reason: ${JSON.stringify(filled)}`);
-  } finally { await session.close(); }
+    assert.ok(
+      !('reason' in (filled['effect'] as object)),
+      `verified must not grow a reason: ${JSON.stringify(filled)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

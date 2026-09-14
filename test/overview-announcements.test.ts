@@ -40,7 +40,9 @@ test('an alert the page raises is in the overview, with its words', async () => 
   const dir = mkdtempSync(join(tmpdir(), 'wir-announce-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -48,8 +50,11 @@ test('an alert the page raises is in the overview, with its words', async () => 
     // Nothing announced yet: the key must be absent, not empty. An overview that
     // always carries the field would train the reader to ignore it.
     const before = await session.dispatch({ verb: 'read' });
-    assert.equal(before['announcements'], undefined,
-      `nothing has been announced yet: ${JSON.stringify(before['announcements'])}`);
+    assert.equal(
+      before['announcements'],
+      undefined,
+      `nothing has been announced yet: ${JSON.stringify(before['announcements'])}`,
+    );
 
     const found = await session.dispatch({ verb: 'find', name: 'Submit Form' });
     const btn = ((found['matches'] ?? []) as { ref: string }[])[0];
@@ -58,10 +63,17 @@ test('an alert the page raises is in the overview, with its words', async () => 
 
     const after = await session.dispatch({ verb: 'read' });
     const announcements = after['announcements'] as { role: string; text: string }[] | undefined;
-    assert.ok(announcements && announcements.length > 0,
-      `the overview must carry what the page announced: ${JSON.stringify(after).slice(0, 400)}`);
+    assert.ok(
+      announcements && announcements.length > 0,
+      `the overview must carry what the page announced: ${JSON.stringify(after).slice(0, 400)}`,
+    );
     assert.equal(announcements[0]!.role, 'alert');
-    assert.match(announcements[0]!.text, /orange-tortoise/,
-      `and its words, not just its ref: ${JSON.stringify(announcements)}`);
-  } finally { await session.close(); }
+    assert.match(
+      announcements[0]!.text,
+      /orange-tortoise/,
+      `and its words, not just its ref: ${JSON.stringify(announcements)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

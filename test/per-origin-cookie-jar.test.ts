@@ -21,10 +21,16 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
-interface Site { name: string; token: string; url: string; other: () => Site; close: () => void }
+interface Site {
+  name: string;
+  token: string;
+  url: string;
+  other: () => Site;
+  close: () => void;
+}
 
 function serve(name: string, token: string, other: () => Site): Promise<Site> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const s: Server = createServer((q, r) => {
       const sent = /(?:^|;\s*)PHPSESSID=([^;]+)/.exec(q.headers.cookie ?? '')?.[1] ?? 'none';
       const headers: Record<string, string> = { 'content-type': 'text/html' };
@@ -42,20 +48,43 @@ function serve(name: string, token: string, other: () => Site): Promise<Site> {
 
 function stateFile(dir: string, name: string, token: string): string {
   const path = join(dir, `${name}.json`);
-  writeFileSync(path, JSON.stringify({ cookies: [{ name: 'PHPSESSID', value: token, domain: '127.0.0.1',
-    path: '/', expires: -1, httpOnly: true, secure: false, sameSite: 'Lax' }], origins: [] }));
+  writeFileSync(
+    path,
+    JSON.stringify({
+      cookies: [
+        {
+          name: 'PHPSESSID',
+          value: token,
+          domain: '127.0.0.1',
+          path: '/',
+          expires: -1,
+          httpOnly: true,
+          secure: false,
+          sameSite: 'Lax',
+        },
+      ],
+      origins: [],
+    }),
+  );
   return path;
 }
 
-async function sessionSeen(session: WirSession, site: Site): Promise<{ verb: number; oracle: string }> {
-  const found = await session.dispatch({ verb: 'find', name: `${site.name} session ${site.token}` });
+async function sessionSeen(
+  session: WirSession,
+  site: Site,
+): Promise<{ verb: number; oracle: string }> {
+  const found = await session.dispatch({
+    verb: 'find',
+    name: `${site.name} session ${site.token}`,
+  });
   const oracle = await session.host.page.evaluate(() => document.body.innerText);
   return { verb: (found['matches'] as unknown[] | undefined)?.length ?? 0, oracle };
 }
 
 test('two same-host origins sharing a cookie name each keep their own session', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-jars-'));
-  let a!: Site; let b!: Site;
+  let a!: Site;
+  let b!: Site;
   a = await serve('A', 'sess-A', () => b);
   b = await serve('B', 'sess-B', () => a);
   const stateA = stateFile(dir, 'A', 'sess-A');
@@ -65,25 +94,46 @@ test('two same-host origins sharing a cookie name each keep their own session', 
     // auto_login does): the fixture must actually collide, or the assertion
     // below proves nothing.
     const merged = join(dir, 'merged.json');
-    writeFileSync(merged, JSON.stringify({ cookies: [
-      ...JSON.parse(readFileSync(stateA, 'utf8')).cookies,
-      ...JSON.parse(readFileSync(stateB, 'utf8')).cookies], origins: [] }));
-    const one = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-      storageStatePath: merged, knownUrls: [a.url, b.url] });
+    writeFileSync(
+      merged,
+      JSON.stringify({
+        cookies: [
+          ...JSON.parse(readFileSync(stateA, 'utf8')).cookies,
+          ...JSON.parse(readFileSync(stateB, 'utf8')).cookies,
+        ],
+        origins: [],
+      }),
+    );
+    const one = await WirSession.start({
+      headless: true,
+      expectedAction: 'RETRIEVE',
+      storageStatePath: merged,
+      knownUrls: [a.url, b.url],
+    });
     try {
       await one.goto(`${a.url}/`);
       const seenA = await sessionSeen(one, a);
       await one.goto(`${b.url}/`);
       const seenB = await sessionSeen(one, b);
-      assert.ok(seenA.verb === 0 || seenB.verb === 0,
-        `control did not collide: A=${JSON.stringify(seenA)} B=${JSON.stringify(seenB)}`);
-    } finally { await one.close(); }
+      assert.ok(
+        seenA.verb === 0 || seenB.verb === 0,
+        `control did not collide: A=${JSON.stringify(seenA)} B=${JSON.stringify(seenB)}`,
+      );
+    } finally {
+      await one.close();
+    }
 
     // THE FIX — a context per declared origin.
     const harPath = join(dir, 'network.har');
-    const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-      storageStatePath: null, storageStates: { [a.url]: stateA, [b.url]: stateB },
-      harPath, tracePath: join(dir, 'trace.zip'), knownUrls: [a.url, b.url] });
+    const session = await WirSession.start({
+      headless: true,
+      expectedAction: 'RETRIEVE',
+      storageStatePath: null,
+      storageStates: { [a.url]: stateA, [b.url]: stateB },
+      harPath,
+      tracePath: join(dir, 'trace.zip'),
+      knownUrls: [a.url, b.url],
+    });
     try {
       await session.goto(`${a.url}/`);
       const seenA = await sessionSeen(session, a);
@@ -107,29 +157,45 @@ test('two same-host origins sharing a cookie name each keep their own session', 
       assert.equal(session.host.page.url(), `${a.url}/`);
       const seenAgain = await sessionSeen(session, a);
       assert.equal(seenAgain.verb, 1, `A after the click from B: ${seenAgain.oracle}`);
-      assert.equal(session.host.divertedNavigations.length, 1, JSON.stringify(session.host.divertedNavigations));
+      assert.equal(
+        session.host.divertedNavigations.length,
+        1,
+        JSON.stringify(session.host.divertedNavigations),
+      );
 
       // And B's own session survived A's visit — the exact thing one jar lost.
       await session.dispatch({ verb: 'navigate', url: `${b.url}/` });
       const seenBAgain = await sessionSeen(session, b);
       assert.equal(seenBAgain.verb, 1, `B after A: ${seenBAgain.oracle}`);
-    } finally { await session.close(); }
+    } finally {
+      await session.close();
+    }
 
     // One HAR, every entry saying which context carried it — the harness reads
     // exactly one file, and the debug plane needs to see two jars in it.
     assert.ok(existsSync(harPath), 'merged HAR missing');
-    const har = JSON.parse(readFileSync(harPath, 'utf8')) as
-      { log: { entries: { request: { url: string; headers: { name: string; value: string }[] }; _wirContext?: string }[] } };
+    const har = JSON.parse(readFileSync(harPath, 'utf8')) as {
+      log: {
+        entries: {
+          request: { url: string; headers: { name: string; value: string }[] };
+          _wirContext?: string;
+        }[];
+      };
+    };
     const byContext = new Map<string, Set<string>>();
     for (const e of har.log.entries) {
-      const cookie = e.request.headers.find(h => h.name.toLowerCase() === 'cookie')?.value ?? '';
+      const cookie = e.request.headers.find((h) => h.name.toLowerCase() === 'cookie')?.value ?? '';
       const sess = /PHPSESSID=([^;]+)/.exec(cookie)?.[1];
       if (sess === undefined) continue;
       const set = byContext.get(e._wirContext ?? '?') ?? new Set<string>();
-      set.add(sess); byContext.set(e._wirContext ?? '?', set);
+      set.add(sess);
+      byContext.set(e._wirContext ?? '?', set);
     }
-    assert.deepEqual([...byContext.get(a.url) ?? []], ['sess-A'], JSON.stringify([...byContext]));
-    assert.deepEqual([...byContext.get(b.url) ?? []], ['sess-B'], JSON.stringify([...byContext]));
+    assert.deepEqual([...(byContext.get(a.url) ?? [])], ['sess-A'], JSON.stringify([...byContext]));
+    assert.deepEqual([...(byContext.get(b.url) ?? [])], ['sess-B'], JSON.stringify([...byContext]));
     assert.ok(!existsSync(`${harPath}.0.part`), 'HAR part file left behind');
-  } finally { a.close(); b.close(); }
+  } finally {
+    a.close();
+    b.close();
+  }
 });

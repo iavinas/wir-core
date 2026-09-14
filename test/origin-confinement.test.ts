@@ -27,7 +27,7 @@ import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
 function serve(body: string): Promise<{ url: string; close: () => void }> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const s: Server = createServer((_q, r) => {
       r.writeHead(200, { 'content-type': 'text/html' });
       r.end(body);
@@ -45,65 +45,85 @@ function serve(body: string): Promise<{ url: string; close: () => void }> {
 // it is observed, and nothing is observed until it is visited. session.goto is the
 // RUNNER's navigation, carrying the same authority as knownUrls, so it seeds before
 // it moves.
-test('the runner\'s own first navigation is not blocked by the observed policy',
-  async () => {
-    const only = await serve('<!doctype html><title>solo</title><h1>Solo</h1>');
+test("the runner's own first navigation is not blocked by the observed policy", async () => {
+  const only = await serve('<!doctype html><title>solo</title><h1>Solo</h1>');
+  try {
+    const session = await WirSession.start({
+      headless: true,
+      expectedAction: 'RETRIEVE',
+      storageStatePath: null,
+      originPolicy: 'observed', // and NO knownUrls: the open-web shape
+    });
     try {
+      await session.goto(only.url); // threw before the fix
+      const ov = (await session.dispatch({ verb: 'read' })) as Record<string, any>;
+      assert.match(
+        String(ov['url']),
+        /^http:\/\/127\.0\.0\.1:/,
+        'an open-web episode can start at all',
+      );
+    } finally {
+      await session.close();
+    }
+  } finally {
+    only.close();
+  }
+});
+
+test('confinement follows the declared set, or the observed one, as the runner says', async () => {
+  const target = await serve('<!doctype html><title>target</title><h1>Target reached</h1>');
+  const start = await serve(
+    '<!doctype html><title>start</title><h1>Start</h1>' +
+      `<a href="${target.url}/page">Go to target</a>`,
+  );
+  try {
+    for (const policy of ['declared', 'observed'] as const) {
       const session = await WirSession.start({
-        headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-        originPolicy: 'observed',      // and NO knownUrls: the open-web shape
+        headless: true,
+        expectedAction: 'RETRIEVE',
+        storageStatePath: null,
+        knownUrls: [start.url], // only the START is declared
+        originPolicy: policy,
       });
       try {
-        await session.goto(only.url);   // threw before the fix
-        const ov = await session.dispatch({ verb: 'read' }) as Record<string, any>;
-        assert.match(String(ov['url']), /^http:\/\/127\.0\.0\.1:/,
-          'an open-web episode can start at all');
-      } finally { await session.close(); }
-    } finally { only.close(); }
-  });
+        await session.goto(start.url);
+        const overview = (await session.dispatch({ verb: 'read' })) as Record<string, any>;
+        const shown = (overview['controls'] ?? []).some((c: any) =>
+          String(c.name ?? '').includes('Go to target'),
+        );
+        assert.ok(shown, 'precondition: the graph showed the cross-origin link');
 
-test('confinement follows the declared set, or the observed one, as the runner says',
-  async () => {
-    const target = await serve('<!doctype html><title>target</title><h1>Target reached</h1>');
-    const start = await serve('<!doctype html><title>start</title><h1>Start</h1>'
-      + `<a href="${target.url}/page">Go to target</a>`);
-    try {
-      for (const policy of ['declared', 'observed'] as const) {
-        const session = await WirSession.start({
-          headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-          knownUrls: [start.url],          // only the START is declared
-          originPolicy: policy,
-        });
-        try {
-          await session.goto(start.url);
-          const overview = await session.dispatch({ verb: 'read' }) as Record<string, any>;
-          const shown = (overview['controls'] ?? [])
-            .some((c: any) => String(c.name ?? '').includes('Go to target'));
-          assert.ok(shown, 'precondition: the graph showed the cross-origin link');
+        const out = (await session.dispatch({
+          verb: 'navigate',
+          url: `${target.url}/page`,
+        })) as Record<string, any>;
 
-          const out = await session.dispatch(
-            { verb: 'navigate', url: `${target.url}/page` }) as Record<string, any>;
-
-          if (policy === 'declared') {
-            // The escape regression. An origin the runner did not name stays
-            // unreachable EVEN THOUGH a page offered it — that is the whole point.
-            assert.equal(out['rejected']?.kind, 'navigation_failed',
-              `declared policy must not follow a link off the declared origins: ${JSON.stringify(out)}`);
-            // And it is a rejection, never a dead episode.
-            const alive = await session.dispatch({ verb: 'read' }) as Record<string, any>;
-            assert.ok(alive['url'] !== undefined, 'the episode survives the refusal');
-          } else {
-            assert.equal(out['rejected'], undefined,
-              `observed policy must reach an origin the graph showed: ${JSON.stringify(out)}`);
-            const after = await session.dispatch({ verb: 'read' }) as Record<string, any>;
-            assert.match(String(after['url']), /\/page$/, 'and it actually arrives');
-          }
-        } finally {
-          await session.close();
+        if (policy === 'declared') {
+          // The escape regression. An origin the runner did not name stays
+          // unreachable EVEN THOUGH a page offered it — that is the whole point.
+          assert.equal(
+            out['rejected']?.kind,
+            'navigation_failed',
+            `declared policy must not follow a link off the declared origins: ${JSON.stringify(out)}`,
+          );
+          // And it is a rejection, never a dead episode.
+          const alive = (await session.dispatch({ verb: 'read' })) as Record<string, any>;
+          assert.ok(alive['url'] !== undefined, 'the episode survives the refusal');
+        } else {
+          assert.equal(
+            out['rejected'],
+            undefined,
+            `observed policy must reach an origin the graph showed: ${JSON.stringify(out)}`,
+          );
+          const after = (await session.dispatch({ verb: 'read' })) as Record<string, any>;
+          assert.match(String(after['url']), /\/page$/, 'and it actually arrives');
         }
+      } finally {
+        await session.close();
       }
-    } finally {
-      start.close();
-      target.close();
     }
-  });
+  } finally {
+    start.close();
+    target.close();
+  }
+});

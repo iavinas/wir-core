@@ -35,22 +35,43 @@ test('type whose input is swallowed reads unknown, never text_typed off ambient 
   const dir = mkdtempSync(join(tmpdir(), 'wir-ambient-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: null, tracePath: null, debugScreenshots: false,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const found = await session.dispatch({ verb: 'find', role: 'textbox', name: 'Editor content' });
     const ref = (found['matches'] as { ref: string }[])[0]?.ref;
     assert.ok(ref, JSON.stringify(found));
-    const acted = await session.dispatch({ verb: 'act', ref, action: 'type', value: 'replacement\ntext' });
-    const effect = acted['effect'] as { verdict: string; evidence: string; delta: { after: string } };
+    const acted = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'type',
+      value: 'replacement\ntext',
+    });
+    const effect = acted['effect'] as {
+      verdict: string;
+      evidence: string;
+      delta: { after: string };
+    };
     assert.ok(effect, JSON.stringify(acted));
-    assert.equal(effect.verdict, 'unknown',
-      `ambient mutations must not prove typing: ${JSON.stringify(acted)}`);
+    assert.equal(
+      effect.verdict,
+      'unknown',
+      `ambient mutations must not prove typing: ${JSON.stringify(acted)}`,
+    );
     assert.equal(effect.evidence, 'no_observable_change_yet');
     // The ambient activity is still REPORTED — honesty about what was seen.
-    assert.match(effect.delta.after, /mutationRecords=[1-9]/,
-      `the delta must still carry the ambient count: ${JSON.stringify(effect.delta)}`);
-  } finally { await session.close(); }
+    assert.match(
+      effect.delta.after,
+      /mutationRecords=[1-9]/,
+      `the delta must still carry the ambient count: ${JSON.stringify(effect.delta)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

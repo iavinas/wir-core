@@ -61,8 +61,11 @@ function serve(): Promise<{ server: Server; url: string; close: () => void }> {
 async function startSession(): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-csr-'));
   return WirSession.start({
-    headless: true, expectedAction: 'NAVIGATE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'NAVIGATE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
 }
@@ -70,7 +73,7 @@ async function startSession(): Promise<WirSession> {
 async function linkRef(session: WirSession, name: string): Promise<string> {
   const page = await session.dispatch({ verb: 'read' });
   const controls = page['controls'] as { ref: string; role: string; name: string }[];
-  const hit = controls.find(c => c.role === 'link' && c.name.includes(name));
+  const hit = controls.find((c) => c.role === 'link' && c.name.includes(name));
   assert.ok(hit, `no link named ${name}: ${JSON.stringify(controls).slice(0, 400)}`);
   return hit.ref;
 }
@@ -84,16 +87,24 @@ test('a pushState link click reports that no document was loaded', async () => {
     const ref = await linkRef(session, 'Carnegie Music Hall');
 
     const act = await session.dispatch({ verb: 'act', action: 'click', ref });
-    const effect = act['effect'] as { verdict: string; evidence: string;
-      delta: { after: string } };
+    const effect = act['effect'] as { verdict: string; evidence: string; delta: { after: string } };
 
-    assert.equal(act['documentEpoch'], before['documentEpoch'],
-      'the fixture must not replace the document, or it tests nothing');
-    assert.match(String(act['url']), /\/way\/154257484$/,
-      `the URL must have moved: ${JSON.stringify(act).slice(0, 300)}`);
-    assert.match(effect.delta.after, /client-side route/,
-      'a URL that moved with no document served must say so, or the model is told '
-      + `it navigated to a destination that was never loaded: ${JSON.stringify(effect)}`);
+    assert.equal(
+      act['documentEpoch'],
+      before['documentEpoch'],
+      'the fixture must not replace the document, or it tests nothing',
+    );
+    assert.match(
+      String(act['url']),
+      /\/way\/154257484$/,
+      `the URL must have moved: ${JSON.stringify(act).slice(0, 300)}`,
+    );
+    assert.match(
+      effect.delta.after,
+      /client-side route/,
+      'a URL that moved with no document served must say so, or the model is told ' +
+        `it navigated to a destination that was never loaded: ${JSON.stringify(effect)}`,
+    );
   } finally {
     await session.close();
     site.close();
@@ -113,10 +124,16 @@ test('a real navigation is untouched and carries no client-side-route note', asy
     const act = await session.dispatch({ verb: 'act', action: 'click', ref });
     const effect = act['effect'] as { verdict: string; delta: { after: string } };
 
-    assert.notEqual(act['documentEpoch'], before['documentEpoch'],
-      'this arm must genuinely replace the document, or the control is vacuous');
-    assert.doesNotMatch(effect.delta.after, /client-side route/,
-      `a real document load must not be labelled a client-side route: ${JSON.stringify(effect)}`);
+    assert.notEqual(
+      act['documentEpoch'],
+      before['documentEpoch'],
+      'this arm must genuinely replace the document, or the control is vacuous',
+    );
+    assert.doesNotMatch(
+      effect.delta.after,
+      /client-side route/,
+      `a real document load must not be labelled a client-side route: ${JSON.stringify(effect)}`,
+    );
   } finally {
     await session.close();
     site.close();

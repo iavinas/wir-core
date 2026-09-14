@@ -44,26 +44,41 @@ test('upload attaches through the label that owns a hidden file input', async ()
   const uploads = mkdtempSync(join(tmpdir(), 'wir-upload-files-'));
   writeFileSync(join(uploads, 'report.txt'), 'proof\n');
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null, uploadDir: uploads,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    uploadDir: uploads,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
 
     for (const name of ['Wrapped upload', 'Pointed upload']) {
       const ref = await refFor(session, name);
-      const acted = await session.dispatch({ verb: 'act', ref, action: 'upload', value: 'report.txt' });
-      assert.ok(!acted['rejected'],
+      const acted = await session.dispatch({
+        verb: 'act',
+        ref,
+        action: 'upload',
+        value: 'report.txt',
+      });
+      assert.ok(
+        !acted['rejected'],
         `${name}: the label is the only affordance this markup has — ` +
-        `refusing it leaves no path to the file: ${JSON.stringify(acted['rejected'])}`);
+          `refusing it leaves no path to the file: ${JSON.stringify(acted['rejected'])}`,
+      );
       const effect = acted['effect'] as Record<string, unknown>;
       assert.equal(effect['evidence'], 'file_attached', JSON.stringify(acted));
       // Read back from the node that was WRITTEN. Reading the label instead
       // reported a real attachment as `contradicted` — the one verdict that can
       // never be walked back.
-      assert.equal(effect['verdict'], 'verified',
-        `the postcondition must consult the input, not the label: ${JSON.stringify(acted)}`);
+      assert.equal(
+        effect['verdict'],
+        'verified',
+        `the postcondition must consult the input, not the label: ${JSON.stringify(acted)}`,
+      );
     }
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('a label with no file input is still refused, and says so', async () => {
@@ -72,14 +87,26 @@ test('a label with no file input is still refused, and says so', async () => {
   const uploads = mkdtempSync(join(tmpdir(), 'wir-upload-files-neg-'));
   writeFileSync(join(uploads, 'report.txt'), 'proof\n');
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null, uploadDir: uploads,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    uploadDir: uploads,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const ref = await refFor(session, 'Not an upload');
-    const acted = await session.dispatch({ verb: 'act', ref, action: 'upload', value: 'report.txt' });
-    assert.ok(acted['rejected'],
+    const acted = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'upload',
+      value: 'report.txt',
+    });
+    assert.ok(
+      acted['rejected'],
       `a label over a text input takes no file, and pretending otherwise is worse ` +
-      `than refusing: ${JSON.stringify(acted)}`);
-  } finally { await session.close(); }
+        `than refusing: ${JSON.stringify(acted)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

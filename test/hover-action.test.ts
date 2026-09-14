@@ -26,31 +26,37 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
-const PAGE = '<!doctype html><title>hover</title><h1>Hover</h1>'
-  + '<div id="t" style="width:200px;height:60px;background:#eee">Hover over me</div>'
-  + '<button id="b">Button</button>'
-  + '<script>'
-  + 'window.seen = [];'
-  + 'const t = document.getElementById("t");'
-  + 'for (const e of ["mouseover","mouseenter","mousemove","mousedown","mouseup","click"]) {'
-  + '  t.addEventListener(e, () => window.seen.push(e));'
-  + '}'
-  + '</script>';
+const PAGE =
+  '<!doctype html><title>hover</title><h1>Hover</h1>' +
+  '<div id="t" style="width:200px;height:60px;background:#eee">Hover over me</div>' +
+  '<button id="b">Button</button>' +
+  '<script>' +
+  'window.seen = [];' +
+  'const t = document.getElementById("t");' +
+  'for (const e of ["mouseover","mouseenter","mousemove","mousedown","mouseup","click"]) {' +
+  '  t.addEventListener(e, () => window.seen.push(e));' +
+  '}' +
+  '</script>';
 
 async function withPage(fn: (s: WirSession) => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-hover-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+  });
   try {
     await session.goto(`file://${join(dir, 'a.html')}`);
     await fn(session);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 }
 
 const findRef = async (s: WirSession, name: string): Promise<string> => {
   await s.dispatch({ verb: 'read' });
-  const r = await s.dispatch({ verb: 'find', name }) as Record<string, any>;
+  const r = (await s.dispatch({ verb: 'find', name })) as Record<string, any>;
   const m = (r['matches'] ?? [])[0];
   assert.ok(m, `precondition: ${name} is findable: ${JSON.stringify(r['matches'])}`);
   return m.ref;
@@ -59,11 +65,13 @@ const findRef = async (s: WirSession, name: string): Promise<string> => {
 test('hover delivers mouseenter to a plain div', async () => {
   await withPage(async (s) => {
     const ref = await findRef(s, 'Hover over me');
-    const r = await s.dispatch({ verb: 'act', ref, action: 'hover' }) as Record<string, any>;
+    const r = (await s.dispatch({ verb: 'act', ref, action: 'hover' })) as Record<string, any>;
     assert.equal(r['rejected'], undefined, `accepted: ${JSON.stringify(r['rejected'])}`);
     const seen = await s.host.page.evaluate(() => (window as any).seen as string[]);
-    assert.ok(seen.includes('mouseenter'),
-      `mouseenter delivered — the whole reason this action exists: ${JSON.stringify(seen)}`);
+    assert.ok(
+      seen.includes('mouseenter'),
+      `mouseenter delivered — the whole reason this action exists: ${JSON.stringify(seen)}`,
+    );
     assert.ok(seen.includes('mouseover'), `and mouseover: ${JSON.stringify(seen)}`);
   });
 });
@@ -75,11 +83,17 @@ test('CONTROL — hover presses nothing, so it is not a click', async () => {
     const ref = await findRef(s, 'Hover over me');
     await s.dispatch({ verb: 'act', ref, action: 'hover' });
     const seen = await s.host.page.evaluate(() => (window as any).seen as string[]);
-    assert.equal(seen.filter(e => e === 'mousedown').length, 0,
-      `no mousedown: ${JSON.stringify(seen)}`);
-    assert.equal(seen.filter(e => e === 'mouseup').length, 0, 'no mouseup');
-    assert.equal(seen.filter(e => e === 'click').length, 0,
-      `and above all no click: ${JSON.stringify(seen)}`);
+    assert.equal(
+      seen.filter((e) => e === 'mousedown').length,
+      0,
+      `no mousedown: ${JSON.stringify(seen)}`,
+    );
+    assert.equal(seen.filter((e) => e === 'mouseup').length, 0, 'no mouseup');
+    assert.equal(
+      seen.filter((e) => e === 'click').length,
+      0,
+      `and above all no click: ${JSON.stringify(seen)}`,
+    );
   });
 });
 

@@ -34,7 +34,9 @@ test('an iframe that grows on its own is not re-served as live', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-frames-'));
   // The child adds a link 400ms after load — no parent mutation, no act, no
   // navigation. Nothing the old vouch could see.
-  writeFileSync(join(dir, 'child.html'), `<!doctype html><title>child</title>
+  writeFileSync(
+    join(dir, 'child.html'),
+    `<!doctype html><title>child</title>
     <a href="/one">frame link one</a>
     <script>
       setTimeout(() => {
@@ -42,12 +44,18 @@ test('an iframe that grows on its own is not re-served as live', async () => {
         a.href = '/two'; a.textContent = 'frame link two';
         document.body.appendChild(a);
       }, 400);
-    </script>`);
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>host</title><h1>Host</h1>
-    <iframe src="file://${dir}/child.html" width="400" height="200"></iframe>`);
+    </script>`,
+  );
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>host</title><h1>Host</h1>
+    <iframe src="file://${dir}/child.html" width="400" height="200"></iframe>`,
+  );
 
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -56,8 +64,11 @@ test('an iframe that grows on its own is not re-served as live', async () => {
     // graph, or this test would pass for the wrong reason on a page whose frame
     // never compiled.
     const first = await session.dispatch({ verb: 'find', name: 'frame link' });
-    assert.equal((first['matches'] as unknown[]).length, 1,
-      `the frame's content must be compiled: ${JSON.stringify(first)}`);
+    assert.equal(
+      (first['matches'] as unknown[]).length,
+      1,
+      `the frame's content must be compiled: ${JSON.stringify(first)}`,
+    );
 
     // Let the child mutate itself, then read again with no act between.
     await session.host.page.waitForTimeout(1200);
@@ -65,11 +76,19 @@ test('an iframe that grows on its own is not re-served as live', async () => {
 
     // The recall claim, stated positively. Asserting only `freshness` would pass
     // on a runtime that recompiled and still lost the node.
-    assert.equal((second['matches'] as unknown[]).length, 2,
-      `the frame's new link must be visible: ${JSON.stringify(second)}`);
-    assert.equal(second['freshness'], 'recompiled',
-      `a mutated frame must not be vouched as live: ${JSON.stringify(second)}`);
-  } finally { await session.close(); }
+    assert.equal(
+      (second['matches'] as unknown[]).length,
+      2,
+      `the frame's new link must be visible: ${JSON.stringify(second)}`,
+    );
+    assert.equal(
+      second['freshness'],
+      'recompiled',
+      `a mutated frame must not be vouched as live: ${JSON.stringify(second)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('a still page is still served from cache, so the fix did not disable the vouch', async () => {
@@ -77,20 +96,32 @@ test('a still page is still served from cache, so the fix did not disable the vo
   // vacuously and the cache would be dead. A frame that does nothing must still
   // let the graph be re-served.
   const dir = mkdtempSync(join(tmpdir(), 'wir-frames-still-'));
-  writeFileSync(join(dir, 'child.html'),
-    '<!doctype html><title>child</title><a href="/one">frame link one</a>');
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>host</title><h1>Host</h1>
-    <iframe src="file://${dir}/child.html" width="400" height="200"></iframe>`);
+  writeFileSync(
+    join(dir, 'child.html'),
+    '<!doctype html><title>child</title><a href="/one">frame link one</a>',
+  );
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>host</title><h1>Host</h1>
+    <iframe src="file://${dir}/child.html" width="400" height="200"></iframe>`,
+  );
 
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     await session.dispatch({ verb: 'read' });
     await session.host.page.waitForTimeout(300);
     const again = await session.dispatch({ verb: 'read' });
-    assert.equal(again['freshness'], 'live',
-      `an unchanged page must still be vouched: ${JSON.stringify(again).slice(0, 200)}`);
-  } finally { await session.close(); }
+    assert.equal(
+      again['freshness'],
+      'live',
+      `an unchanged page must still be vouched: ${JSON.stringify(again).slice(0, 200)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

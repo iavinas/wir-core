@@ -45,39 +45,62 @@ function serve(): Promise<{ server: Server; base: string }> {
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end(PAGE);
   });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => {
-    const addr = server.address() as { port: number };
-    resolve({ server, base: `http://127.0.0.1:${addr.port}` });
-  }));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number };
+      resolve({ server, base: `http://127.0.0.1:${addr.port}` });
+    }),
+  );
 }
 
-async function fillByName(session: WirSession, name: string, value: string):
-    Promise<{ verdict: string; evidence: string; delta: { before: string; after: string } }> {
-  const found = await session.dispatch({ verb: 'find', name }) as
-    { matches?: { ref: string }[] };
+async function fillByName(
+  session: WirSession,
+  name: string,
+  value: string,
+): Promise<{ verdict: string; evidence: string; delta: { before: string; after: string } }> {
+  const found = (await session.dispatch({ verb: 'find', name })) as { matches?: { ref: string }[] };
   const ref = found.matches?.[0]?.ref;
   assert.ok(ref, `find ${JSON.stringify(name)} returned a match`);
-  const acted = await session.dispatch({ verb: 'act', ref, action: 'fill', value }) as
-    { effect?: { verdict: string; evidence: string; delta: { before: string; after: string } };
-      rejected?: unknown };
-  assert.equal(acted.rejected, undefined, `fill was not rejected: ${JSON.stringify(acted.rejected)}`);
+  const acted = (await session.dispatch({ verb: 'act', ref, action: 'fill', value })) as {
+    effect?: { verdict: string; evidence: string; delta: { before: string; after: string } };
+    rejected?: unknown;
+  };
+  assert.equal(
+    acted.rejected,
+    undefined,
+    `fill was not rejected: ${JSON.stringify(acted.rejected)}`,
+  );
   assert.ok(acted.effect, 'fill returned an effect');
-  return acted.effect as { verdict: string; evidence: string; delta: { before: string; after: string } };
+  return acted.effect as {
+    verdict: string;
+    evidence: string;
+    delta: { before: string; after: string };
+  };
 }
 
 test('a formatting readback verifies, with both strings verbatim in the delta', async () => {
   const { server, base } = await serve();
-  const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-    storageStatePath: null, harPath: null, tracePath: null, debugScreenshots: false });
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
+  });
   try {
     await session.goto(`${base}/`);
     const effect = await fillByName(session, 'Card number', '4111111111111111');
     assert.equal(effect.verdict, 'verified');
     assert.equal(effect.evidence, 'value_set');
-    assert.ok(effect.delta.after.includes('"4111 1111 1111 1111"'),
-      `the delta carries the field's own formatting verbatim: ${effect.delta.after}`);
-    assert.ok(effect.delta.after.includes('"4111111111111111"'),
-      `the delta carries the requested value verbatim: ${effect.delta.after}`);
+    assert.ok(
+      effect.delta.after.includes('"4111 1111 1111 1111"'),
+      `the delta carries the field's own formatting verbatim: ${effect.delta.after}`,
+    );
+    assert.ok(
+      effect.delta.after.includes('"4111111111111111"'),
+      `the delta carries the requested value verbatim: ${effect.delta.after}`,
+    );
   } finally {
     await session.close().catch(() => undefined);
     server.close();
@@ -86,8 +109,14 @@ test('a formatting readback verifies, with both strings verbatim in the delta', 
 
 test('dropped or substituted content still contradicts; byte equality is unchanged', async () => {
   const { server, base } = await serve();
-  const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-    storageStatePath: null, harPath: null, tracePath: null, debugScreenshots: false });
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
+  });
   try {
     await session.goto(`${base}/`);
     // The mask drops every character: nothing left to compare, contradicted stays.

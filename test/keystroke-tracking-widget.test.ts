@@ -43,7 +43,9 @@ test('a filled field survives the blur of the next click', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-keyup-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -52,7 +54,11 @@ test('a filled field survives the blur of the next click', async () => {
     const field = ((found['matches'] ?? []) as { ref: string }[])[0];
     assert.ok(field, `precondition: the field is findable: ${JSON.stringify(found)}`);
     const filled = await session.dispatch({
-      verb: 'act', ref: field.ref, action: 'fill', value: '01/15/1990' });
+      verb: 'act',
+      ref: field.ref,
+      action: 'fill',
+      value: '01/15/1990',
+    });
     assert.ok(!filled['rejected'], JSON.stringify(filled['rejected']));
 
     // Anything else on the page — here the next control, on the real page the
@@ -64,8 +70,13 @@ test('a filled field survives the blur of the next click', async () => {
 
     const after = await session.dispatch({ verb: 'read', target: field.ref });
     const node = after['node'] as Record<string, unknown>;
-    assert.equal(node['value'], '01/15/1990',
+    assert.equal(
+      node['value'],
+      '01/15/1990',
       'a widget that tracks keystrokes must have seen this fill; otherwise it ' +
-      `re-asserts an empty state on blur and verified/value_set was a lie: ${JSON.stringify(after)}`);
-  } finally { await session.close(); }
+        `re-asserts an empty state on blur and verified/value_set was a lie: ${JSON.stringify(after)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

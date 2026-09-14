@@ -44,12 +44,16 @@ const PAGE = `<!doctype html><title>keys</title><h1>Host</h1>
     setInterval(() => { document.getElementById('churn').textContent = String(Date.now()); }, 20);
   </script>`;
 
-async function startOn(html: string,
-    expectedAction: 'RETRIEVE' | 'MUTATE' = 'RETRIEVE'): Promise<WirSession> {
+async function startOn(
+  html: string,
+  expectedAction: 'RETRIEVE' | 'MUTATE' = 'RETRIEVE',
+): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-key-'));
   writeFileSync(join(dir, 'a.html'), html);
   const session = await WirSession.start({
-    headless: true, expectedAction, storageStatePath: null,
+    headless: true,
+    expectedAction,
+    storageStatePath: null,
     debugScreenshots: false,
   });
   await session.goto(`file://${dir}/a.html`);
@@ -76,10 +80,13 @@ test('type refuses a chord-shaped value instead of replacing the content with it
     assert.match(rejected?.repair ?? '', /"action":"key"/, 'the repair must point at key');
     assert.equal(acted['effect'], undefined, 'a refusal dispatches nothing');
     // The 442 defect itself: the document must be exactly as it was.
-    const value = await session.host.page.evaluate(() =>
-      (document.getElementById('ed') as HTMLTextAreaElement).value);
+    const value = await session.host.page.evaluate(
+      () => (document.getElementById('ed') as HTMLTextAreaElement).value,
+    );
     assert.equal(value, 'original content');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('type still writes ordinary text that merely contains a plus sign', async () => {
@@ -88,12 +95,20 @@ test('type still writes ordinary text that merely contains a plus sign', async (
     const ref = await editorRef(session);
     // The refusal keys on the WHOLE value's shape, never on page content, and
     // it must not cost the caller any text a page might legitimately ask for.
-    const acted = await session.dispatch({ verb: 'act', ref, action: 'type', value: 'C++ and a+b' });
+    const acted = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'type',
+      value: 'C++ and a+b',
+    });
     assert.equal(effectOf(acted).verdict, 'verified', JSON.stringify(acted));
-    const value = await session.host.page.evaluate(() =>
-      (document.getElementById('ed') as HTMLTextAreaElement).value);
+    const value = await session.host.page.evaluate(
+      () => (document.getElementById('ed') as HTMLTextAreaElement).value,
+    );
     assert.equal(value, 'C++ and a+b');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('looksLikeChord is narrow in both directions', () => {
@@ -102,8 +117,17 @@ test('looksLikeChord is narrow in both directions', () => {
   }
   // Bare key names stay typeable: Enter, Tab, Delete, Home, Clear, Select and
   // Help are ordinary English words a page may ask for.
-  for (const text of ['Escape', 'Enter', 'Delete', 'Select', 'C++ tutorial', 'a+b',
-    '1+1=2', 'rock+roll', '']) {
+  for (const text of [
+    'Escape',
+    'Enter',
+    'Delete',
+    'Select',
+    'C++ tutorial',
+    'a+b',
+    '1+1=2',
+    'rock+roll',
+    '',
+  ]) {
     assert.equal(looksLikeChord(text), false, text);
   }
 });
@@ -116,9 +140,10 @@ test('key dispatches a real key event, virtual key code and modifier bitmask inc
     assert.equal(effectOf(acted).verdict, 'verified', JSON.stringify(acted));
     assert.equal(effectOf(acted).evidence, 'selection_changed');
     // Ground truth: what the PAGE received. A press, never text.
-    const seen = await session.host.page.evaluate(() =>
-      (globalThis as unknown as { seen: Record<string, unknown>[] }).seen);
-    const main = seen.find(e => e['key'] === 'a');
+    const seen = await session.host.page.evaluate(
+      () => (globalThis as unknown as { seen: Record<string, unknown>[] }).seen,
+    );
+    const main = seen.find((e) => e['key'] === 'a');
     assert.ok(main, `the page never saw the main key: ${JSON.stringify(seen)}`);
     assert.equal(main['code'], 'KeyA');
     assert.equal(main['keyCode'], 65, 'windowsVirtualKeyCode must travel (browser-use port)');
@@ -132,7 +157,9 @@ test('key dispatches a real key event, virtual key code and modifier bitmask inc
       return { start: ed.selectionStart, end: ed.selectionEnd, len: ed.value.length };
     });
     assert.deepEqual(sel, { start: 0, end: 16, len: 16 });
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('key never types: the target keeps its content byte for byte', async () => {
@@ -140,10 +167,13 @@ test('key never types: the target keeps its content byte for byte', async () => 
   try {
     const ref = await editorRef(session);
     await session.dispatch({ verb: 'act', ref, action: 'key', value: 'Control+a' });
-    const value = await session.host.page.evaluate(() =>
-      (document.getElementById('ed') as HTMLTextAreaElement).value);
+    const value = await session.host.page.evaluate(
+      () => (document.getElementById('ed') as HTMLTextAreaElement).value,
+    );
     assert.equal(value, 'original content', 'act key must dispatch keys, never insert text');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('a key the page ignores reads unknown, never verified off ambient mutations', async () => {
@@ -162,7 +192,9 @@ test('a key the page ignores reads unknown, never verified off ambient mutations
     // The records are still REPORTED — withheld from the verdict, not from the caller.
     const delta = (acted['effect'] as { delta: { after: string } }).delta;
     assert.match(delta.after, /mutationRecords=[1-9]/, JSON.stringify(delta));
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('key refuses a name it cannot press rather than dispatching a dead event', async () => {
@@ -173,13 +205,19 @@ test('key refuses a name it cannot press rather than dispatching a dead event', 
     // no-op this action exists to remove, so it is a refusal (core/keys.ts).
     for (const bad of ['flurb', 'Ctrl+a', 'toString', 'Control+flurb']) {
       const acted = await session.dispatch({ verb: 'act', ref, action: 'key', value: bad });
-      assert.equal((acted['rejected'] as { kind: string } | undefined)?.kind, 'invalid_args',
-        `${bad}: ${JSON.stringify(acted)}`);
+      assert.equal(
+        (acted['rejected'] as { kind: string } | undefined)?.kind,
+        'invalid_args',
+        `${bad}: ${JSON.stringify(acted)}`,
+      );
     }
-    const seen = await session.host.page.evaluate(() =>
-      (globalThis as unknown as { seen: unknown[] }).seen);
+    const seen = await session.host.page.evaluate(
+      () => (globalThis as unknown as { seen: unknown[] }).seen,
+    );
     assert.equal(seen.length, 0, 'a refused key must dispatch nothing at all');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 // Earned in the FIELD, not by review: task 442 on the key build (n=3,
@@ -201,28 +239,37 @@ test('a keypress that deletes content says so, and is not called a selection cha
     // platform-neutral, which is the point: the defect is in the VERDICT, and it
     // must be pinned by a key that behaves the same everywhere.
     await session.dispatch({ verb: 'act', ref, action: 'key', value: 'End' });
-    const before = await session.host.page.evaluate(() =>
-      (document.getElementById('ed') as HTMLTextAreaElement).value);
+    const before = await session.host.page.evaluate(
+      () => (document.getElementById('ed') as HTMLTextAreaElement).value,
+    );
 
     const acted = await session.dispatch({ verb: 'act', ref, action: 'key', value: 'Backspace' });
     const effect = effectOf(acted);
 
-    const after = await session.host.page.evaluate(() =>
-      (document.getElementById('ed') as HTMLTextAreaElement).value);
+    const after = await session.host.page.evaluate(
+      () => (document.getElementById('ed') as HTMLTextAreaElement).value,
+    );
     assert.equal(after.length, before.length - 1, 'the fixture must actually lose a character');
 
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
-    assert.equal(effect.evidence, 'text_edited',
-      `a deletion reported as ${String(effect.evidence)} is the false verified this pins`);
+    assert.equal(
+      effect.evidence,
+      'text_edited',
+      `a deletion reported as ${String(effect.evidence)} is the false verified this pins`,
+    );
     // The delta reports the OBSERVED quantity and does not claim to know the
     // document. Asserting "content shrank" here would re-pin the false claim
     // this wording replaced: a readable window can resize with no edit at all,
     // measured live when Monaco went 383 -> 438 on a one-character deletion.
     const delta = (acted['effect'] as { delta: { after: string } }).delta;
     assert.match(delta.after, /readable window \d+ -> \d+ characters/, JSON.stringify(delta));
-    assert.ok(!/content (SHRANK|GREW)/.test(delta.after),
-      'the delta must not claim a document-level change it cannot observe');
-  } finally { await session.close(); }
+    assert.ok(
+      !/content (SHRANK|GREW)/.test(delta.after),
+      'the delta must not claim a document-level change it cannot observe',
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('a caret move with no content change is still selection_changed', async () => {
@@ -232,12 +279,18 @@ test('a caret move with no content change is still selection_changed', async () 
     const acted = await session.dispatch({ verb: 'act', ref, action: 'key', value: 'End' });
     const effect = effectOf(acted);
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
-    assert.equal(effect.evidence, 'selection_changed',
-      'splitting out text_edited must not swallow the arm it was split from');
-    const value = await session.host.page.evaluate(() =>
-      (document.getElementById('ed') as HTMLTextAreaElement).value);
+    assert.equal(
+      effect.evidence,
+      'selection_changed',
+      'splitting out text_edited must not swallow the arm it was split from',
+    );
+    const value = await session.host.page.evaluate(
+      () => (document.getElementById('ed') as HTMLTextAreaElement).value,
+    );
     assert.equal(value, 'original content', 'moving the caret must not touch content');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('text_edited can never satisfy the MUTATE gate', async () => {
@@ -248,15 +301,20 @@ test('text_edited can never satisfy the MUTATE gate', async () => {
     const acted = await session.dispatch({ verb: 'act', ref, action: 'key', value: 'Backspace' });
     assert.equal(effectOf(acted).evidence, 'text_edited');
     // Editing a buffer is not a site change. The finish gate must still refuse.
-    const finish = await session.dispatch({ verb: 'finish', answer: '',
-      evidenceRefs: [(acted as { actRef: string }).actRef] });
+    const finish = await session.dispatch({
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [(acted as { actRef: string }).actRef],
+    });
     // The gate answers with a TYPED REJECTION, not accepted:false — asserting the
     // wrong shape here would pass on a gate that had silently stopped running.
     assert.equal(finish['accepted'], undefined, JSON.stringify(finish));
     const rejected = finish['rejected'] as { kind: string; reason: string };
     assert.equal(rejected.kind, 'finish_rejected', JSON.stringify(finish));
     assert.match(rejected.reason, /verdict verified/, JSON.stringify(finish));
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 // Repairs that cannot succeed, from a review that inventoried all 25 repair
@@ -284,13 +342,20 @@ test('a stale nameless ref is repaired by read, never by find with an empty name
     const rejected = acted['rejected'] as { kind: string; repair?: string } | undefined;
     assert.equal(rejected?.kind, 'stale_ref', JSON.stringify(acted));
     const repair = String(rejected?.repair ?? '');
-    assert.ok(!/"name"\s*:\s*""/.test(repair),
-      `the repair must not mint an empty-name find: ${repair}`);
+    assert.ok(
+      !/"name"\s*:\s*""/.test(repair),
+      `the repair must not mint an empty-name find: ${repair}`,
+    );
     assert.match(repair, /"verb"\s*:\s*"read"/, repair);
 
     // And the contract that makes the old form a dead end must still hold.
     const empty = await session.dispatch({ verb: 'find', name: '' });
-    assert.equal((empty['rejected'] as { kind: string } | undefined)?.kind, 'invalid_args',
-      'find must still reject an empty name, or this regression pins nothing');
-  } finally { await session.close(); }
+    assert.equal(
+      (empty['rejected'] as { kind: string } | undefined)?.kind,
+      'invalid_args',
+      'find must still reject an empty name, or this regression pins nothing',
+    );
+  } finally {
+    await session.close();
+  }
 });

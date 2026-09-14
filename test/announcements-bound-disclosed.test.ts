@@ -44,7 +44,9 @@ test('the announcements bound is disclosed and its continuations reach everythin
   const dir = mkdtempSync(join(tmpdir(), 'wir-announce-bound-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -55,10 +57,8 @@ test('the announcements bound is disclosed and its continuations reach everythin
     const first = one['announcements'] as { text: string }[];
     assert.equal(first.length, 1);
     assert.equal(first[0]!.text, 'First: saved.');
-    assert.equal(one['announcementsTotal'], undefined,
-      'no total when nothing was withheld');
-    assert.equal(one['moreAnnouncements'], undefined,
-      'no more-block when nothing was withheld');
+    assert.equal(one['announcementsTotal'], undefined, 'no total when nothing was withheld');
+    assert.equal(one['moreAnnouncements'], undefined, 'no more-block when nothing was withheld');
 
     const found = await session.dispatch({ verb: 'find', name: 'Raise More' });
     const btn = ((found['matches'] ?? []) as { ref: string }[])[0];
@@ -70,28 +70,40 @@ test('the announcements bound is disclosed and its continuations reach everythin
     const shown = ov['announcements'] as { ref: string; text: string }[];
     assert.equal(shown.length, 4, JSON.stringify(shown));
     assert.equal(ov['announcementsTotal'], 5);
-    const more = ov['moreAnnouncements'] as
-      { count: number; unit: string; estimated: boolean; continuation: string };
+    const more = ov['moreAnnouncements'] as {
+      count: number;
+      unit: string;
+      estimated: boolean;
+      continuation: string;
+    };
     assert.equal(more.count, 1);
     assert.equal(more.unit, 'announcements');
     assert.equal(more.estimated, false);
     const page2 = await session.dispatch(JSON.parse(more.continuation));
     const fifth = page2['announcements'] as { text: string }[];
-    assert.ok(fifth.some(x => x.text.includes('Fifth-alert-sentinel')),
-      `the continuation must deliver the withheld alert: ${JSON.stringify(fifth)}`);
+    assert.ok(
+      fifth.some((x) => x.text.includes('Fifth-alert-sentinel')),
+      `the continuation must deliver the withheld alert: ${JSON.stringify(fifth)}`,
+    );
 
     // (b) long text: complete-so-far + inline marker whose continuation reaches
     // the remainder — followed as minted, not reconstructed.
-    const long = shown.find(x => x.text.includes('…[+'));
+    const long = shown.find((x) => x.text.includes('…[+'));
     assert.ok(long, `one entry carries the bound marker: ${JSON.stringify(shown)}`);
-    assert.ok(long!.text.startsWith(LONG.slice(0, 320)),
-      'complete-so-far: the visible prefix is the text itself');
+    assert.ok(
+      long!.text.startsWith(LONG.slice(0, 320)),
+      'complete-so-far: the visible prefix is the text itself',
+    );
     const m = /…\[\+(\d+) chars: (\{.*\})\]$/.exec(long!.text);
     assert.ok(m, `marker carries count and continuation: ${long!.text.slice(-120)}`);
     assert.equal(Number(m![1]), LONG.length - 320, 'the residual is exact');
     const rest = await session.dispatch(JSON.parse(m![2]!));
     assert.equal(rest['textOffset'], 320);
-    assert.ok(String(rest['content']).includes('End-of-alert-tail-sentinel'),
-      `the continuation must deliver the withheld characters: ${JSON.stringify(rest['content'])}`);
-  } finally { await session.close(); }
+    assert.ok(
+      String(rest['content']).includes('End-of-alert-tail-sentinel'),
+      `the continuation must deliver the withheld characters: ${JSON.stringify(rest['content'])}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

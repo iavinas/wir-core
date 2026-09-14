@@ -58,8 +58,11 @@ function serve(): Promise<{ server: Server; url: string; close: () => void }> {
 async function session(): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-resolved-'));
   return WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
 }
@@ -71,7 +74,7 @@ test('a value typed into one field is not attributed to another', async () => {
     await s.goto(site.url);
     const found = await s.dispatch({ verb: 'find', role: 'textbox' });
     const matches = found['matches'] as Record<string, unknown>[];
-    const from = matches.find(m => String(m['name'] ?? '').includes('From'));
+    const from = matches.find((m) => String(m['name'] ?? '').includes('From'));
     assert.ok(from, `the From field must compile: ${JSON.stringify(matches)}`);
 
     // Shares the word "university" with the OTHER field's standing value and is
@@ -79,17 +82,22 @@ test('a value typed into one field is not attributed to another', async () => {
     // value is recorded after this envelope is built, so the following call is
     // where it could be mis-paired.
     await s.dispatch({
-      verb: 'act', action: 'fill', ref: String(from['ref']),
+      verb: 'act',
+      action: 'fill',
+      ref: String(from['ref']),
       value: 'Carnegie Mellon University',
     });
     const next = await s.dispatch({ verb: 'read' });
 
     const resolved = next['resolvedDifferently'] as
       { youTyped: string; nowReads: string }[] | undefined;
-    const bogus = (resolved ?? []).filter(r => r.nowReads.includes('Chatham'));
-    assert.equal(bogus.length, 0,
-      'the To field was never typed into, so nothing the caller typed resolved to '
-      + `its value: ${JSON.stringify(resolved)}`);
+    const bogus = (resolved ?? []).filter((r) => r.nowReads.includes('Chatham'));
+    assert.equal(
+      bogus.length,
+      0,
+      'the To field was never typed into, so nothing the caller typed resolved to ' +
+        `its value: ${JSON.stringify(resolved)}`,
+    );
   } finally {
     await s.close();
     site.close();
@@ -106,20 +114,25 @@ test('a field that expands what you typed into IT still reports', async () => {
     await s.goto(site.url);
     const found = await s.dispatch({ verb: 'find', role: 'textbox' });
     const matches = found['matches'] as Record<string, unknown>[];
-    const from = matches.find(m => String(m['name'] ?? '').includes('From'))!;
+    const from = matches.find((m) => String(m['name'] ?? '').includes('From'))!;
 
     // The page rewrites this field in place on input.
     await s.dispatch({
-      verb: 'act', action: 'fill', ref: String(from['ref']), value: 'Carnegie Mellon',
+      verb: 'act',
+      action: 'fill',
+      ref: String(from['ref']),
+      value: 'Carnegie Mellon',
     });
     const next = await s.dispatch({ verb: 'read' });
 
     const resolved = next['resolvedDifferently'] as
       { youTyped: string; nowReads: string }[] | undefined;
-    assert.ok(resolved && resolved.some(r =>
-      r.youTyped === 'Carnegie Mellon' && r.nowReads.includes('Forbes')),
-      'the field the caller wrote expanded its own value and must still be '
-      + `reported: ${JSON.stringify(resolved)}`);
+    assert.ok(
+      resolved &&
+        resolved.some((r) => r.youTyped === 'Carnegie Mellon' && r.nowReads.includes('Forbes')),
+      'the field the caller wrote expanded its own value and must still be ' +
+        `reported: ${JSON.stringify(resolved)}`,
+    );
   } finally {
     await s.close();
     site.close();
@@ -138,23 +151,35 @@ test('a field written twice reports the value written LAST', async () => {
     await s.goto(site.url);
     const found = await s.dispatch({ verb: 'find', role: 'textbox' });
     const matches = found['matches'] as Record<string, unknown>[];
-    const from = matches.find(m => String(m['name'] ?? '').includes('From'))!;
+    const from = matches.find((m) => String(m['name'] ?? '').includes('From'))!;
 
     await s.dispatch({
-      verb: 'act', action: 'fill', ref: String(from['ref']), value: 'University of Pittsburgh',
+      verb: 'act',
+      action: 'fill',
+      ref: String(from['ref']),
+      value: 'University of Pittsburgh',
     });
     await s.dispatch({
-      verb: 'act', action: 'fill', ref: String(from['ref']), value: 'Chatham University',
+      verb: 'act',
+      action: 'fill',
+      ref: String(from['ref']),
+      value: 'Chatham University',
     });
     const next = await s.dispatch({ verb: 'read' });
 
     const resolved = next['resolvedDifferently'] as
       { youTyped: string; nowReads: string }[] | undefined;
-    const forFrom = (resolved ?? []).filter(r => r.nowReads.includes('Chatham'));
-    assert.ok(forFrom.length > 0, `the rewritten field must still report: ${JSON.stringify(resolved)}`);
-    assert.equal(forFrom[0]!.youTyped, 'Chatham University',
-      'the field now holds a resolution of the LAST thing written to it, not the '
-      + `first: ${JSON.stringify(resolved)}`);
+    const forFrom = (resolved ?? []).filter((r) => r.nowReads.includes('Chatham'));
+    assert.ok(
+      forFrom.length > 0,
+      `the rewritten field must still report: ${JSON.stringify(resolved)}`,
+    );
+    assert.equal(
+      forFrom[0]!.youTyped,
+      'Chatham University',
+      'the field now holds a resolution of the LAST thing written to it, not the ' +
+        `first: ${JSON.stringify(resolved)}`,
+    );
   } finally {
     await s.close();
     site.close();
@@ -177,7 +202,7 @@ test('a field that echoes what you last typed reports nothing at all', async () 
     await s.goto(site.url);
     const found = await s.dispatch({ verb: 'find', role: 'textbox' });
     const matches = found['matches'] as Record<string, unknown>[];
-    const from = matches.find(m => String(m['name'] ?? '').includes('From'))!;
+    const from = matches.find((m) => String(m['name'] ?? '').includes('From'))!;
     const ref = String(from['ref']);
 
     // An earlier query that WOULD qualify against the final value — the stale
@@ -185,17 +210,22 @@ test('a field that echoes what you last typed reports nothing at all', async () 
     await s.dispatch({ verb: 'act', action: 'fill', ref, value: 'Carnegie Mellon' });
     // Then the real one, typed in full, which the page echoes unchanged.
     await s.dispatch({
-      verb: 'act', action: 'fill', ref,
+      verb: 'act',
+      action: 'fill',
+      ref,
       value: 'Carnegie Mellon University, Forbes Avenue, Pittsburgh',
     });
     const next = await s.dispatch({ verb: 'read' });
 
-    const resolved = (next['resolvedDifferently'] as
-      { youTyped: string; nowReads: string }[] | undefined) ?? [];
-    const stale = resolved.filter(r => r.youTyped === 'Carnegie Mellon');
-    assert.equal(stale.length, 0,
-      'the last thing written to the field is the only thing its value can be a '
-      + `resolution of; an earlier query must not be quoted: ${JSON.stringify(resolved)}`);
+    const resolved =
+      (next['resolvedDifferently'] as { youTyped: string; nowReads: string }[] | undefined) ?? [];
+    const stale = resolved.filter((r) => r.youTyped === 'Carnegie Mellon');
+    assert.equal(
+      stale.length,
+      0,
+      'the last thing written to the field is the only thing its value can be a ' +
+        `resolution of; an earlier query must not be quoted: ${JSON.stringify(resolved)}`,
+    );
   } finally {
     await s.close();
     site.close();

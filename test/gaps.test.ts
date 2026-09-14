@@ -29,10 +29,14 @@ import { WirSession } from '../src/session.js';
 
 test('a same-process frame is compiled, findable, and raises no gap', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-gaps-'));
-  writeFileSync(join(dir, 'frame.html'),
-    '<!doctype html><title>ad</title><p>inside the frame</p><a href="/x">frame link</a>');
-  writeFileSync(join(dir, 'a.html'),
-    `<!doctype html><title>a</title><h1>Host page</h1><iframe src="file://${dir}/frame.html"></iframe>`);
+  writeFileSync(
+    join(dir, 'frame.html'),
+    '<!doctype html><title>ad</title><p>inside the frame</p><a href="/x">frame link</a>',
+  );
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>a</title><h1>Host page</h1><iframe src="file://${dir}/frame.html"></iframe>`,
+  );
 
   const session = await WirSession.start({
     headless: true,
@@ -51,19 +55,27 @@ test('a same-process frame is compiled, findable, and raises no gap', async () =
     // what make that claim checkable rather than asserted.
     assert.equal(overview['coverageIncomplete'], false, JSON.stringify(overview));
     const gaps = overview['gaps'] as unknown[] | undefined;
-    assert.ok(gaps === undefined || gaps.length === 0,
-      `a fully compiled page must raise no gap: ${JSON.stringify(gaps)}`);
+    assert.ok(
+      gaps === undefined || gaps.length === 0,
+      `a fully compiled page must raise no gap: ${JSON.stringify(gaps)}`,
+    );
 
     // The recall claim, stated positively: the frame's content is IN the graph.
     // Asserting only "no gap" would pass just as well if the frame had been
     // silently dropped — which is the defect class this test exists to catch.
     const link = await session.dispatch({ verb: 'find', name: 'frame link' });
-    assert.equal((link['matches'] as unknown[]).length, 1,
-      `the frame's own link must be reachable: ${JSON.stringify(link)}`);
+    assert.equal(
+      (link['matches'] as unknown[]).length,
+      1,
+      `the frame's own link must be reachable: ${JSON.stringify(link)}`,
+    );
 
     const text = await session.dispatch({ verb: 'find', name: 'inside the frame' });
-    assert.equal((text['matches'] as unknown[]).length, 1,
-      `the frame's own text must be reachable: ${JSON.stringify(text)}`);
+    assert.equal(
+      (text['matches'] as unknown[]).length,
+      1,
+      `the frame's own text must be reachable: ${JSON.stringify(text)}`,
+    );
   } finally {
     await session.close();
   }

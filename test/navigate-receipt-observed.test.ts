@@ -28,15 +28,23 @@ import { WirSession } from '../src/session.js';
 
 type Hit = { url: string; referer: string | null; dest: string | null };
 
-function serve(page: (other: string) => string, other = ''):
-    Promise<{ server: Server; url: string; hits: Hit[]; close: () => void }> {
+function serve(
+  page: (other: string) => string,
+  other = '',
+): Promise<{ server: Server; url: string; hits: Hit[]; close: () => void }> {
   return new Promise((resolve) => {
     const hits: Hit[] = [];
     const server = createServer((req: IncomingMessage, res) => {
-      hits.push({ url: req.url ?? '', referer: req.headers['referer'] ?? null,
-        dest: (req.headers['sec-fetch-dest'] as string | undefined) ?? null });
+      hits.push({
+        url: req.url ?? '',
+        referer: req.headers['referer'] ?? null,
+        dest: (req.headers['sec-fetch-dest'] as string | undefined) ?? null,
+      });
       if ((req.url ?? '').startsWith('/api/')) {
-        res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
+        res.writeHead(200, {
+          'content-type': 'application/json',
+          'access-control-allow-origin': '*',
+        });
         res.end('{"ok":true}');
         return;
       }
@@ -62,63 +70,95 @@ const PAGE = (other: string) => `<!doctype html><title>grid</title><h1>Orders</h
 async function buttonRef(session: WirSession): Promise<string> {
   const page = await session.dispatch({ verb: 'read' });
   const controls = page['controls'] as { ref: string; role: string; name: string }[];
-  const hit = controls.find(c => c.role === 'button' && c.name === 'Apply');
+  const hit = controls.find((c) => c.role === 'button' && c.name === 'Apply');
   assert.ok(hit, `no Apply button: ${JSON.stringify(controls).slice(0, 400)}`);
   return hit.ref;
 }
 
-test('a receipt request URL is navigable, and the load arrives with the served page as Referer',
-  async () => {
-    // A second origin: the CDN / beacon case the closure keeps out.
-    const elsewhere = await serve(() => '<!doctype html>');
-    const site = await serve(PAGE, elsewhere.url);
-    const session = await WirSession.start({
-      headless: true, expectedAction: 'NAVIGATE', storageStatePath: null });
-    try {
-      await session.goto(site.url);
-      const first = site.hits.find(h => h.url === '/');
-      assert.ok(first, 'the fixture was served');
-      assert.equal(first.referer, null, 'the opening goto of an episode carries no Referer');
-
-      // BEFORE the act nothing has shown /api/x: the closure refuses it, so the
-      // admission below is the receipt's doing and nothing else's.
-      const early = await session.dispatch({ verb: 'navigate', url: `${site.url}api/x?y=1` });
-      const earlyRejected = early['rejected'] as { kind: string; reason: string } | undefined;
-      assert.equal(earlyRejected?.kind, 'invalid_args', JSON.stringify(early).slice(0, 300));
-      assert.match(earlyRejected.reason, /requests the receipts have shown/,
-        'the closure names its third source');
-
-      const act = await session.dispatch({ verb: 'act', action: 'click', ref: await buttonRef(session) });
-      assert.equal(act['outcome'], 'delivered', JSON.stringify(act).slice(0, 300));
-      const receipt = act['receipt'] as { requests: { url: string; method: string }[] };
-      const shown = receipt.requests.map(r => r.url);
-      assert.ok(shown.includes(`${site.url}api/x?y=1`), `the receipt shows the fetch: ${JSON.stringify(shown)}`);
-      assert.ok(shown.includes(`${elsewhere.url}api/elsewhere?z=2`),
-        `the receipt shows the cross-origin fetch too: ${JSON.stringify(shown)}`);
-
-      // THE CONTROL: shown, but on another origin — not the site's own words.
-      const foreign = await session.dispatch({ verb: 'navigate', url: `${elsewhere.url}api/elsewhere?z=2` });
-      assert.equal((foreign['rejected'] as { kind: string } | undefined)?.kind, 'invalid_args',
-        `a cross-origin receipt address stays outside the closure: ${JSON.stringify(foreign).slice(0, 300)}`);
-
-      // THE FIX: the address the receipt showed, on the page's own origin.
-      const nav = await session.dispatch({ verb: 'navigate', url: `${site.url}api/x?y=1` });
-      assert.equal(nav['navigated'], true, JSON.stringify(nav).slice(0, 400));
-      const doc = nav['document'] as { servedUrl: string };
-      assert.equal(doc.servedUrl, `${site.url}api/x?y=1`, 'the receipt address is now the served document');
-      const replaced = nav['replaced'] as { servedUrl: string; addressShown: boolean };
-      assert.equal(replaced.servedUrl, site.url);
-      assert.equal(replaced.addressShown, true, 'the exact address (query included) counts as shown');
-
-      // THE REFERER, from the server's own record of the document GET — the
-      // XHR the button sent carries the page as referer natively; the
-      // navigation must too.
-      const docGets = site.hits.filter(h => h.url === '/api/x?y=1' && h.dest === 'document');
-      assert.equal(docGets.length, 1, `one document GET for the address: ${JSON.stringify(site.hits)}`);
-      assert.equal(docGets[0]?.referer, site.url, 'the load arrived with the page it left as Referer');
-    } finally {
-      await session.close();
-      site.close();
-      elsewhere.close();
-    }
+test('a receipt request URL is navigable, and the load arrives with the served page as Referer', async () => {
+  // A second origin: the CDN / beacon case the closure keeps out.
+  const elsewhere = await serve(() => '<!doctype html>');
+  const site = await serve(PAGE, elsewhere.url);
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'NAVIGATE',
+    storageStatePath: null,
   });
+  try {
+    await session.goto(site.url);
+    const first = site.hits.find((h) => h.url === '/');
+    assert.ok(first, 'the fixture was served');
+    assert.equal(first.referer, null, 'the opening goto of an episode carries no Referer');
+
+    // BEFORE the act nothing has shown /api/x: the closure refuses it, so the
+    // admission below is the receipt's doing and nothing else's.
+    const early = await session.dispatch({ verb: 'navigate', url: `${site.url}api/x?y=1` });
+    const earlyRejected = early['rejected'] as { kind: string; reason: string } | undefined;
+    assert.equal(earlyRejected?.kind, 'invalid_args', JSON.stringify(early).slice(0, 300));
+    assert.match(
+      earlyRejected.reason,
+      /requests the receipts have shown/,
+      'the closure names its third source',
+    );
+
+    const act = await session.dispatch({
+      verb: 'act',
+      action: 'click',
+      ref: await buttonRef(session),
+    });
+    assert.equal(act['outcome'], 'delivered', JSON.stringify(act).slice(0, 300));
+    const receipt = act['receipt'] as { requests: { url: string; method: string }[] };
+    const shown = receipt.requests.map((r) => r.url);
+    assert.ok(
+      shown.includes(`${site.url}api/x?y=1`),
+      `the receipt shows the fetch: ${JSON.stringify(shown)}`,
+    );
+    assert.ok(
+      shown.includes(`${elsewhere.url}api/elsewhere?z=2`),
+      `the receipt shows the cross-origin fetch too: ${JSON.stringify(shown)}`,
+    );
+
+    // THE CONTROL: shown, but on another origin — not the site's own words.
+    const foreign = await session.dispatch({
+      verb: 'navigate',
+      url: `${elsewhere.url}api/elsewhere?z=2`,
+    });
+    assert.equal(
+      (foreign['rejected'] as { kind: string } | undefined)?.kind,
+      'invalid_args',
+      `a cross-origin receipt address stays outside the closure: ${JSON.stringify(foreign).slice(0, 300)}`,
+    );
+
+    // THE FIX: the address the receipt showed, on the page's own origin.
+    const nav = await session.dispatch({ verb: 'navigate', url: `${site.url}api/x?y=1` });
+    assert.equal(nav['navigated'], true, JSON.stringify(nav).slice(0, 400));
+    const doc = nav['document'] as { servedUrl: string };
+    assert.equal(
+      doc.servedUrl,
+      `${site.url}api/x?y=1`,
+      'the receipt address is now the served document',
+    );
+    const replaced = nav['replaced'] as { servedUrl: string; addressShown: boolean };
+    assert.equal(replaced.servedUrl, site.url);
+    assert.equal(replaced.addressShown, true, 'the exact address (query included) counts as shown');
+
+    // THE REFERER, from the server's own record of the document GET — the
+    // XHR the button sent carries the page as referer natively; the
+    // navigation must too.
+    const docGets = site.hits.filter((h) => h.url === '/api/x?y=1' && h.dest === 'document');
+    assert.equal(
+      docGets.length,
+      1,
+      `one document GET for the address: ${JSON.stringify(site.hits)}`,
+    );
+    assert.equal(
+      docGets[0]?.referer,
+      site.url,
+      'the load arrived with the page it left as Referer',
+    );
+  } finally {
+    await session.close();
+    site.close();
+    elsewhere.close();
+  }
+});

@@ -42,7 +42,9 @@ test('a click that reveals a message reports the message, not a count', async ()
   const dir = mkdtempSync(join(tmpdir(), 'wir-mutdelta-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -55,19 +57,28 @@ test('a click that reveals a message reports the message, not a count', async ()
     const delta = effect['delta'] as Record<string, unknown>;
     const after = String(delta['after'] ?? '');
 
-    assert.match(after, /Date of Birth is required\./,
-      `the caller must be able to read WHY, not just that something happened: ${after}`);
-  } finally { await session.close(); }
+    assert.match(
+      after,
+      /Date of Birth is required\./,
+      `the caller must be able to read WHY, not just that something happened: ${after}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('a click that changes nothing visible still says nothing extra', async () => {
   // The other direction: this must not start narrating every page that repaints,
   // or the delta becomes noise and the economy invariant pays for it.
   const dir = mkdtempSync(join(tmpdir(), 'wir-mutdelta-quiet-'));
-  writeFileSync(join(dir, 'a.html'),
-    `<!doctype html><title>quiet</title><main><button id="go">Nothing</button></main>`);
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>quiet</title><main><button id="go">Nothing</button></main>`,
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -77,7 +88,11 @@ test('a click that changes nothing visible still says nothing extra', async () =
     const acted = await session.dispatch({ verb: 'act', ref: btn.ref, action: 'click' });
     const effect = (acted['effect'] ?? {}) as Record<string, unknown>;
     const delta = (effect['delta'] ?? {}) as Record<string, unknown>;
-    assert.ok(!String(delta['after'] ?? '').includes('now showing'),
-      `a click with no visible answer must not invent one: ${JSON.stringify(acted)}`);
-  } finally { await session.close(); }
+    assert.ok(
+      !String(delta['after'] ?? '').includes('now showing'),
+      `a click with no visible answer must not invent one: ${JSON.stringify(acted)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

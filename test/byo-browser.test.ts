@@ -12,18 +12,21 @@ import { WirSession } from '../src/session.js';
 function fixture(): string {
   const dir = mkdtempSync(join(tmpdir(), 'wir-byo-'));
   writeFileSync(join(dir, 'b.html'), '<!doctype html><title>b</title><h1>Page B</h1>');
-  writeFileSync(join(dir, 'a.html'),
-    `<!doctype html><title>a</title><h1>Host page</h1><a href="file://${dir}/b.html">to page b</a>`);
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>a</title><h1>Host page</h1><a href="file://${dir}/b.html">to page b</a>`,
+  );
   return dir;
 }
 
 test('attach drives find/read/act over a separately-launched Chromium and leaves it running', async () => {
-  const port = 20000 + (process.pid % 10000);   // parallel-safe, deterministic per process
+  const port = 20000 + (process.pid % 10000); // parallel-safe, deterministic per process
   const external = await chromium.launch({ args: [`--remote-debugging-port=${port}`] });
   try {
     const dir = fixture();
     const session = await WirSession.attach({
-      cdpEndpoint: `http://localhost:${port}`, expectedAction: 'RETRIEVE',
+      cdpEndpoint: `http://localhost:${port}`,
+      expectedAction: 'RETRIEVE',
     });
     await session.goto(`file://${dir}/a.html`);
 
@@ -41,8 +44,11 @@ test('attach drives find/read/act over a separately-launched Chromium and leaves
     assert.equal(effect.evidence, 'navigated_to_destination');
 
     await session.close();
-    assert.equal(external.isConnected(), true,
-      'closing an attached session must not kill the caller-owned browser');
+    assert.equal(
+      external.isConnected(),
+      true,
+      'closing an attached session must not kill the caller-owned browser',
+    );
   } finally {
     await external.close();
   }

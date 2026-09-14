@@ -30,29 +30,46 @@ function serve(): Promise<{ server: Server; base: string }> {
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end(PAGE);
   });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => {
-    const addr = server.address() as { port: number };
-    resolve({ server, base: `http://127.0.0.1:${addr.port}` });
-  }));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number };
+      resolve({ server, base: `http://127.0.0.1:${addr.port}` });
+    }),
+  );
 }
 
-async function clickByName(session: WirSession, name: string):
-    Promise<{ verdict: string; evidence: string; reason?: string }> {
-  const found = await session.dispatch({ verb: 'find', role: 'button', name }) as
-    { matches?: { ref: string }[] };
+async function clickByName(
+  session: WirSession,
+  name: string,
+): Promise<{ verdict: string; evidence: string; reason?: string }> {
+  const found = (await session.dispatch({ verb: 'find', role: 'button', name })) as {
+    matches?: { ref: string }[];
+  };
   const ref = found.matches?.[0]?.ref;
   assert.ok(ref, `find ${JSON.stringify(name)} returned a match`);
-  const acted = await session.dispatch({ verb: 'act', ref, action: 'click' }) as
-    { effect?: { verdict: string; evidence: string; reason?: string }; rejected?: unknown };
-  assert.equal(acted.rejected, undefined, `click was not rejected: ${JSON.stringify(acted.rejected)}`);
+  const acted = (await session.dispatch({ verb: 'act', ref, action: 'click' })) as {
+    effect?: { verdict: string; evidence: string; reason?: string };
+    rejected?: unknown;
+  };
+  assert.equal(
+    acted.rejected,
+    undefined,
+    `click was not rejected: ${JSON.stringify(acted.rejected)}`,
+  );
   assert.ok(acted.effect, 'click returned an effect');
   return acted.effect as { verdict: string; evidence: string; reason?: string };
 }
 
 test('an answered application POST with zero mutations is named in the unknown reason', async () => {
   const { server, base } = await serve();
-  const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-    storageStatePath: null, harPath: null, tracePath: null, debugScreenshots: false });
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
+  });
   try {
     await session.goto(`${base}/`);
     const effect = await clickByName(session, 'Save changes');
@@ -60,9 +77,11 @@ test('an answered application POST with zero mutations is named in the unknown r
     assert.equal(effect.verdict, 'unknown');
     assert.equal(effect.evidence, 'no_observable_change_yet');
     assert.ok(effect.reason, 'the unknown carries a reason');
-    assert.match(effect.reason as string,
+    assert.match(
+      effect.reason as string,
       /an application POST to \S+\/save was answered 200 in this act's window, yet nothing changed on the page/,
-      `the reason names the answered submit: ${effect.reason}`);
+      `the reason names the answered submit: ${effect.reason}`,
+    );
   } finally {
     await session.close().catch(() => undefined);
     server.close();
@@ -71,16 +90,24 @@ test('an answered application POST with zero mutations is named in the unknown r
 
 test('a click with no request keeps its reason byte-for-byte (control)', async () => {
   const { server, base } = await serve();
-  const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-    storageStatePath: null, harPath: null, tracePath: null, debugScreenshots: false });
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
+  });
   try {
     await session.goto(`${base}/`);
     const effect = await clickByName(session, 'Do nothing');
     assert.equal(effect.verdict, 'unknown');
     assert.equal(effect.evidence, 'no_observable_change_yet');
-    assert.equal(effect.reason,
-      'no navigation started; no document request was seen; '
-      + "the target's own state did not change; 0 mutation records followed the dispatch");
+    assert.equal(
+      effect.reason,
+      'no navigation started; no document request was seen; ' +
+        "the target's own state did not change; 0 mutation records followed the dispatch",
+    );
   } finally {
     await session.close().catch(() => undefined);
     server.close();

@@ -31,7 +31,11 @@ const PAGE = `<!doctype html><title>barred</title>
 async function open(expectedAction: 'MUTATE' | 'RETRIEVE') {
   const dir = mkdtempSync(join(tmpdir(), 'wir-finish-status-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
-  const session = await WirSession.start({ headless: true, expectedAction, storageStatePath: null });
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction,
+    storageStatePath: null,
+  });
   await session.goto(`file://${dir}/a.html`);
   return session;
 }
@@ -48,18 +52,30 @@ for (const status of ['action_not_allowed_error', 'permission_denied_error'] as 
     const session = await open('MUTATE');
     try {
       const ref = await aRef(session);
-      const out = await session.dispatch({ verb: 'finish', answer: '', evidenceRefs: [ref], status });
+      const out = await session.dispatch({
+        verb: 'finish',
+        answer: '',
+        evidenceRefs: [ref],
+        status,
+      });
       assert.ok(!out['rejected'], `must be accepted, got ${JSON.stringify(out)}`);
       assert.equal(out['status'], status, 'the claim must travel as itself, not be rewritten');
-    } finally { await session.close(); }
+    } finally {
+      await session.close();
+    }
   });
 
   test(`${status} without evidence refs is refused`, async () => {
     const session = await open('MUTATE');
     try {
       const out = await session.dispatch({ verb: 'finish', answer: '', evidenceRefs: [], status });
-      assert.ok(out['rejected'], 'an unevidenced refusal is a claim about the world with nothing behind it');
-    } finally { await session.close(); }
+      assert.ok(
+        out['rejected'],
+        'an unevidenced refusal is a claim about the world with nothing behind it',
+      );
+    } finally {
+      await session.close();
+    }
   });
 }
 
@@ -68,9 +84,18 @@ test('a status outside the vocabulary is still refused, and the message names th
   try {
     const ref = await aRef(session);
     const out = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [ref], status: 'unknown_error' as never });
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [ref],
+      status: 'unknown_error' as never,
+    });
     assert.ok(out['rejected'], 'give_up is an agent-local tool and never a finish status');
     const reason = JSON.stringify(out);
-    assert.ok(reason.includes('action_not_allowed_error'), `the rejection should name the set: ${reason}`);
-  } finally { await session.close(); }
+    assert.ok(
+      reason.includes('action_not_allowed_error'),
+      `the rejection should name the set: ${reason}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

@@ -49,53 +49,87 @@ test('pseudo-element carousel controls are in find, in read.controls, and act re
   const dir = mkdtempSync(join(tmpdir(), 'wir-ax-only-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     // The oracle: what the browser itself says exists. If this Chromium does not
     // render carousel pseudo-elements, there is nothing to withhold and the
     // condition is absent, not passed.
-    const rendered = await session.host.page.evaluate(() =>
-      getComputedStyle(document.querySelector('.carousel')!, '::scroll-button(inline-end)').content);
-    assert.ok(rendered.includes('Scroll Right'), `this Chromium renders ::scroll-button: ${rendered}`);
+    const rendered = await session.host.page.evaluate(
+      () =>
+        getComputedStyle(document.querySelector('.carousel')!, '::scroll-button(inline-end)')
+          .content,
+    );
+    assert.ok(
+      rendered.includes('Scroll Right'),
+      `this Chromium renders ::scroll-button: ${rendered}`,
+    );
 
     const buttons = await session.dispatch({ verb: 'find', role: 'button' });
-    const names = ((buttons['matches'] ?? []) as { name?: string }[]).map(m => m.name);
-    assert.deepEqual([...names].sort(), ['Scroll Left', 'Scroll Right'],
-      `both scroll buttons the AX tree names must be findable: ${JSON.stringify(buttons)}`);
+    const names = ((buttons['matches'] ?? []) as { name?: string }[]).map((m) => m.name);
+    assert.deepEqual(
+      [...names].sort(),
+      ['Scroll Left', 'Scroll Right'],
+      `both scroll buttons the AX tree names must be findable: ${JSON.stringify(buttons)}`,
+    );
     const tabs = await session.dispatch({ verb: 'find', role: 'tab' });
-    const tabMatches = (tabs['matches'] ?? []) as { ref: string; name?: string; state?: Record<string, unknown> }[];
-    assert.deepEqual(tabMatches.map(m => m.name), ['Alpha', 'Bravo', 'Charlie'],
-      `every scroll marker is a tab with its own alt text: ${JSON.stringify(tabs)}`);
+    const tabMatches = (tabs['matches'] ?? []) as {
+      ref: string;
+      name?: string;
+      state?: Record<string, unknown>;
+    }[];
+    assert.deepEqual(
+      tabMatches.map((m) => m.name),
+      ['Alpha', 'Bravo', 'Charlie'],
+      `every scroll marker is a tab with its own alt text: ${JSON.stringify(tabs)}`,
+    );
 
     // Recall through read as well: a control find returns and read omits, while
     // read reports nothing withheld, is the same defect at the other verb.
     const overview = await session.dispatch({ verb: 'read' });
     const controls = (overview['controls'] ?? []) as { ref: string; name?: string }[];
-    const right = ((buttons['matches'] ?? []) as { ref: string; name?: string }[])
-      .find(m => m.name === 'Scroll Right')!;
-    assert.ok(controls.some(c => c.ref === right.ref),
-      `read.controls must hold the button find returns: ${JSON.stringify(controls.map(c => c.name))}`);
+    const right = ((buttons['matches'] ?? []) as { ref: string; name?: string }[]).find(
+      (m) => m.name === 'Scroll Right',
+    )!;
+    assert.ok(
+      controls.some((c) => c.ref === right.ref),
+      `read.controls must hold the button find returns: ${JSON.stringify(controls.map((c) => c.name))}`,
+    );
 
     // And the ref is one act can drive: the same backend id, the same
     // revalidation, a real hit point. The oracle is the scroller's own position.
-    const before = await session.host.page.evaluate(() => document.querySelector('.carousel')!.scrollLeft);
+    const before = await session.host.page.evaluate(
+      () => document.querySelector('.carousel')!.scrollLeft,
+    );
     const clicked = await session.dispatch({ verb: 'act', ref: right.ref, action: 'click' });
-    assert.equal(clicked['outcome'], 'delivered', `click must not be refused: ${JSON.stringify(clicked)}`);
+    assert.equal(
+      clicked['outcome'],
+      'delivered',
+      `click must not be refused: ${JSON.stringify(clicked)}`,
+    );
     await session.host.page.waitForTimeout(600);
-    const after = await session.host.page.evaluate(() => document.querySelector('.carousel')!.scrollLeft);
+    const after = await session.host.page.evaluate(
+      () => document.querySelector('.carousel')!.scrollLeft,
+    );
     assert.ok(after > before, `the scroll button must move the carousel: ${before} -> ${after}`);
 
     // A tab click is verified by the browser's own state: the marker's
     // `selected` follows scroll position, and act's revalidation reads it.
-    const bravo = tabMatches.find(m => m.name === 'Charlie')!;
+    const bravo = tabMatches.find((m) => m.name === 'Charlie')!;
     const tabbed = await session.dispatch({ verb: 'act', ref: bravo.ref, action: 'click' });
     const effect = tabbed['effect'] as { verdict?: string; evidence?: string } | undefined;
     assert.equal(effect?.verdict, 'verified', `tab click must verify: ${JSON.stringify(tabbed)}`);
     assert.equal(effect?.evidence, 'target_state_changed');
     const selected = await session.dispatch({ verb: 'find', role: 'tab', state: 'selected' });
-    assert.deepEqual(((selected['matches'] ?? []) as { name?: string }[]).map(m => m.name), ['Charlie'],
-      `selection moved with no DOM mutation, so the graph must not have been re-served: ${JSON.stringify(selected)}`);
-  } finally { await session.close(); }
+    assert.deepEqual(
+      ((selected['matches'] ?? []) as { name?: string }[]).map((m) => m.name),
+      ['Charlie'],
+      `selection moved with no DOM mutation, so the graph must not have been re-served: ${JSON.stringify(selected)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

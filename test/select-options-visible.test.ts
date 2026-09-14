@@ -62,8 +62,11 @@ function serve(): Promise<{ server: Server; url: string; close: () => void }> {
 async function session(): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-opts-'));
   return WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
 }
@@ -75,21 +78,29 @@ test('a select carries its option labels in read, and the decoy does not', async
     await s.goto(site.url);
     const page = await s.dispatch({ verb: 'read' });
     const controls = page['controls'] as Record<string, unknown>[];
-    const real = controls.find(c => String(c['name'] ?? '').includes('Find Order By'));
+    const real = controls.find((c) => String(c['name'] ?? '').includes('Find Order By'));
     assert.ok(real, `the select must compile: ${JSON.stringify(controls).slice(0, 400)}`);
-    assert.deepEqual(real['optionLabels'], ['Email', 'ZIP Code', 'Order Number'],
-      'the caller has to choose one of these, so it has to be able to read them: '
-      + JSON.stringify(real));
+    assert.deepEqual(
+      real['optionLabels'],
+      ['Email', 'ZIP Code', 'Order Number'],
+      'the caller has to choose one of these, so it has to be able to read them: ' +
+        JSON.stringify(real),
+    );
     assert.equal(real['optionCount'], 3);
 
     // THE CONTROL. A styled div with role=combobox owns no options, and saying it
     // did would make optionCount useless for its original purpose — telling the
     // real chooser from the wrapper beside it.
-    const decoy = controls.find(c => String(c['name'] ?? '').includes('Search')
-      || String(c['name'] ?? '').includes('styled'));
+    const decoy = controls.find(
+      (c) =>
+        String(c['name'] ?? '').includes('Search') || String(c['name'] ?? '').includes('styled'),
+    );
     if (decoy) {
-      assert.equal(decoy['optionLabels'], undefined,
-        `a wrapper with no <option> children must not claim any: ${JSON.stringify(decoy)}`);
+      assert.equal(
+        decoy['optionLabels'],
+        undefined,
+        `a wrapper with no <option> children must not claim any: ${JSON.stringify(decoy)}`,
+      );
     }
   } finally {
     await s.close();
@@ -107,10 +118,13 @@ test('find carries them too, so the caller need not know which verb to ask', asy
     await s.goto(site.url);
     const found = await s.dispatch({ verb: 'find', role: 'combobox' });
     const matches = found['matches'] as Record<string, unknown>[];
-    const real = matches.find(m => String(m['name'] ?? '').includes('Find Order By'));
+    const real = matches.find((m) => String(m['name'] ?? '').includes('Find Order By'));
     assert.ok(real, `find must reach the select: ${JSON.stringify(found).slice(0, 400)}`);
-    assert.deepEqual(real['optionLabels'], ['Email', 'ZIP Code', 'Order Number'],
-      `find must show the options too: ${JSON.stringify(real)}`);
+    assert.deepEqual(
+      real['optionLabels'],
+      ['Email', 'ZIP Code', 'Order Number'],
+      `find must show the options too: ${JSON.stringify(real)}`,
+    );
   } finally {
     await s.close();
     site.close();
@@ -126,15 +140,21 @@ test('a label read off the node is a label act(select) accepts', async () => {
     await s.goto(site.url);
     const found = await s.dispatch({ verb: 'find', role: 'combobox' });
     const matches = found['matches'] as Record<string, unknown>[];
-    const real = matches.find(m => String(m['name'] ?? '').includes('Find Order By'))!;
-    const label = (real['optionLabels'] as string[])[1]!;   // 'ZIP Code'
+    const real = matches.find((m) => String(m['name'] ?? '').includes('Find Order By'))!;
+    const label = (real['optionLabels'] as string[])[1]!; // 'ZIP Code'
 
     const act = await s.dispatch({
-      verb: 'act', action: 'select', ref: String(real['ref']), value: label,
+      verb: 'act',
+      action: 'select',
+      ref: String(real['ref']),
+      value: label,
     });
     const effect = act['effect'] as { verdict: string; evidence: string };
-    assert.equal(effect.verdict, 'verified',
-      `the label the runtime showed must be one act accepts: ${JSON.stringify(act).slice(0, 400)}`);
+    assert.equal(
+      effect.verdict,
+      'verified',
+      `the label the runtime showed must be one act accepts: ${JSON.stringify(act).slice(0, 400)}`,
+    );
     assert.equal(effect.evidence, 'option_selected');
   } finally {
     await s.close();

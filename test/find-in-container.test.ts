@@ -19,7 +19,13 @@ import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
 type Container = { ref: string; role: string; name?: string };
-type Match = { ref: string; role: string; name: string; text?: string; in?: Container | Container[] };
+type Match = {
+  ref: string;
+  role: string;
+  name: string;
+  text?: string;
+  in?: Container | Container[];
+};
 
 const PAGE = `<!doctype html><title>in</title>
 <nav><ul><li><a href="#"><span>Content</span></a></li></ul></nav>
@@ -36,7 +42,9 @@ async function open(): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-in-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   await session.goto(`file://${dir}/a.html`);
   return session;
@@ -46,22 +54,24 @@ test('two matches that print alike are told apart by `in`', async () => {
   const session = await open();
   try {
     const r = await session.dispatch({ verb: 'find', name: 'Content' });
-    const generics = ((r['matches'] ?? []) as Match[]).filter(m => m.role === 'generic');
+    const generics = ((r['matches'] ?? []) as Match[]).filter((m) => m.role === 'generic');
     assert.equal(generics.length, 2, JSON.stringify(r));
     const [a, b] = generics as [Match, Match];
     assert.ok(a.in && b.in, `both must carry in: ${JSON.stringify(generics)}`);
     assert.notDeepEqual(a.in, b.in, `in must differ: ${JSON.stringify(generics)}`);
-    const roles = generics.map(m => (m.in as Container).role).sort();
+    const roles = generics.map((m) => (m.in as Container).role).sort();
     // Nearest first: the nav one sits in its link (a named container), the form
     // one in the form — the page's own landmark, not an invented label.
     assert.deepEqual(roles, ['form', 'link'], JSON.stringify(generics));
-    const inForm = generics.find(m => (m.in as Container).role === 'form')!;
+    const inForm = generics.find((m) => (m.in as Container).role === 'form')!;
     assert.equal((inForm.in as Container).name, 'Product', JSON.stringify(inForm));
     // The link's container is printed with its name, so the reader sees the
     // words, not just a role.
-    const inLink = generics.find(m => (m.in as Container).role === 'link')!;
+    const inLink = generics.find((m) => (m.in as Container).role === 'link')!;
     assert.equal((inLink.in as Container).name, 'Content', JSON.stringify(inLink));
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('a unique match carries no `in` in find; its read does', async () => {
@@ -77,7 +87,9 @@ test('a unique match carries no `in` in find; its read does', async () => {
     const d = await session.dispatch({ verb: 'read', target: matches[0]!.ref });
     const node = d['node'] as { in?: Container };
     assert.equal(node.in?.role, 'main', JSON.stringify(d['node']));
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('when the nearest containers read the same, `in` is the chain until they differ', async () => {
@@ -93,7 +105,9 @@ test('when the nearest containers read the same, `in` is the chain until they di
       assert.equal(chain[0]!.role, 'region');
       assert.equal(chain[0]!.name, 'Panel');
     }
-    const outer = matches.map(m => (m.in as Container[])[1]!.role).sort();
+    const outer = matches.map((m) => (m.in as Container[])[1]!.role).sort();
     assert.deepEqual(outer, ['complementary', 'main'], JSON.stringify(matches));
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });

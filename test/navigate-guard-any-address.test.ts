@@ -51,95 +51,155 @@ function serve(): Promise<{ server: Server; url: string; close: () => void }> {
   });
 }
 
-type Block = { servedUrl: string; shownUrl: string; callsSinceServed: number;
-  routesSinceServed: number; lastRoute: string | null };
+type Block = {
+  servedUrl: string;
+  shownUrl: string;
+  callsSinceServed: number;
+  routesSinceServed: number;
+  lastRoute: string | null;
+};
 type Rejected = { kind: string; reason: string; repair: string };
 
 async function linkRef(session: WirSession, name: string): Promise<string> {
   const page = await session.dispatch({ verb: 'read' });
   const controls = page['controls'] as { ref: string; role: string; name: string }[];
-  const hit = controls.find(c => c.role === 'link' && c.name.includes(name));
+  const hit = controls.find((c) => c.role === 'link' && c.name.includes(name));
   assert.ok(hit, `no link named ${name}: ${JSON.stringify(controls).slice(0, 400)}`);
   return hit.ref;
 }
 
-test('every load while a client-side route is shown is refused by address kind; force loads; shown == served loads',
-  async () => {
-    const site = await serve();
-    const session = await WirSession.start({
-      headless: true, expectedAction: 'NAVIGATE', storageStatePath: null });
-    try {
-      await session.goto(site.url);
-      const home = await session.dispatch({ verb: 'read' });
-      assert.equal((home['document'] as Block).shownUrl, site.url);
-
-      // CONTROL: nothing routed, a reload of the served address is admitted.
-      const plain = await session.dispatch({ verb: 'navigate', url: site.url });
-      assert.equal(plain['navigated'], true,
-        `shown == served: a reload is not the losing move: ${JSON.stringify(plain).slice(0, 300)}`);
-      const reloaded = await session.dispatch({ verb: 'read' });
-      assert.equal((reloaded['document'] as Block).routesSinceServed, 0);
-
-      // The page routes on top of the served document without a load. The read
-      // above put the real link's href in the closure.
-      const act = await session.dispatch({ verb: 'act', action: 'click', ref: await linkRef(session, 'Directions') });
-      assert.equal(act['documentEpoch'], reloaded['documentEpoch'],
-        'the fixture must not replace the document, or it tests nothing');
-      const routed = act['document'] as Block;
-      assert.equal(routed.servedUrl, site.url, 'served stays: no document was loaded');
-      assert.match(routed.shownUrl, /\/directions\?engine=foot/, 'shown moved');
-      assert.equal(routed.routesSinceServed, 1);
-
-      // THE FOUR SHAPES, in the order the probe sent them. Each is refused by
-      // the kind that names its address, loads nothing, and keeps the state.
-      const shapes: [string, string, string][] = [
-        ['the served address plus a fragment', `${site.url}#`, 'navigate_would_discard_shown_state'],
-        ['the served address', site.url, 'navigate_would_discard_shown_state'],
-        ['a different path in the closure, no query', `${site.url}elsewhere`, 'navigate_would_replace_served_document'],
-        ['a different path plus a fragment', `${site.url}elsewhere#map=4/40/-95`, 'navigate_would_replace_served_document'],
-        ['a composed query on a known path', `${site.url}directions?engine=car&route=9,9;8,8`, 'navigate_constructed_address'],
-      ];
-      for (const [label, url, kind] of shapes) {
-        const refused = await session.dispatch({ verb: 'navigate', url });
-        const rejected = refused['rejected'] as Rejected | undefined;
-        assert.equal(rejected?.kind, kind,
-          `${label}: expected ${kind}, got ${JSON.stringify(refused).slice(0, 400)}`);
-        assert.ok(rejected.reason.includes(url) && rejected.reason.includes(routed.shownUrl),
-          `${label}: the reason names the address asked for and the shown one: ${rejected.reason}`);
-        assert.match(rejected.repair, /force/, `${label}: the repair says an override exists`);
-        assert.doesNotMatch(rejected.repair, /"force":\s*true/, `${label}: the repair does not spell out the forced call`);
-        const still = await session.dispatch({ verb: 'read' });
-        assert.equal(still['documentEpoch'], reloaded['documentEpoch'], `${label}: a refusal loads nothing`);
-        assert.equal((still['document'] as Block).shownUrl, routed.shownUrl, `${label}: the shown state is kept`);
-      }
-      // The different-path refusal says what a load would do to the SERVED record.
-      const other = await session.dispatch({ verb: 'navigate', url: `${site.url}elsewhere` });
-      const otherRejected = other['rejected'] as Rejected;
-      assert.ok(otherRejected.reason.includes(site.url), `the reason names the served document: ${otherRejected.reason}`);
-      assert.match(otherRejected.reason, /1 time\(s\) since/, 'the reason counts the routes since the served document');
-
-      // force:true is the model's decision, honoured verbatim and disclosed.
-      const forced = await session.dispatch({ verb: 'navigate', url: site.url, force: true });
-      assert.equal(forced['navigated'], true, JSON.stringify(forced).slice(0, 300));
-      assert.notEqual(forced['documentEpoch'], reloaded['documentEpoch'], 'a real load rolls the epoch');
-      const rep = forced['replaced'] as Block & { clientSideRoute: boolean; addressShown: boolean };
-      assert.equal(rep.clientSideRoute, true);
-      assert.equal(rep.shownUrl, routed.shownUrl, 'replaced names the state the load discarded');
-      const loaded = forced['document'] as Block;
-      assert.equal(loaded.servedUrl, site.url);
-      assert.equal(loaded.shownUrl, site.url, 'the shown state is gone');
-      assert.equal(loaded.routesSinceServed, 0);
-
-      // CONTROL: shown == served again, a load of a different path is admitted
-      // — the guard is on the condition, not a blanket on every navigate.
-      const admitted = await session.dispatch({ verb: 'navigate', url: `${site.url}elsewhere` });
-      assert.equal(admitted['navigated'], true,
-        `shown == served: a load of another path is not the losing move: ${JSON.stringify(admitted).slice(0, 300)}`);
-      const rep2 = admitted['replaced'] as { clientSideRoute: boolean };
-      assert.equal(rep2.clientSideRoute, false);
-      assert.equal((admitted['document'] as Block).servedUrl, `${site.url}elsewhere`);
-    } finally {
-      await session.close();
-      site.close();
-    }
+test('every load while a client-side route is shown is refused by address kind; force loads; shown == served loads', async () => {
+  const site = await serve();
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'NAVIGATE',
+    storageStatePath: null,
   });
+  try {
+    await session.goto(site.url);
+    const home = await session.dispatch({ verb: 'read' });
+    assert.equal((home['document'] as Block).shownUrl, site.url);
+
+    // CONTROL: nothing routed, a reload of the served address is admitted.
+    const plain = await session.dispatch({ verb: 'navigate', url: site.url });
+    assert.equal(
+      plain['navigated'],
+      true,
+      `shown == served: a reload is not the losing move: ${JSON.stringify(plain).slice(0, 300)}`,
+    );
+    const reloaded = await session.dispatch({ verb: 'read' });
+    assert.equal((reloaded['document'] as Block).routesSinceServed, 0);
+
+    // The page routes on top of the served document without a load. The read
+    // above put the real link's href in the closure.
+    const act = await session.dispatch({
+      verb: 'act',
+      action: 'click',
+      ref: await linkRef(session, 'Directions'),
+    });
+    assert.equal(
+      act['documentEpoch'],
+      reloaded['documentEpoch'],
+      'the fixture must not replace the document, or it tests nothing',
+    );
+    const routed = act['document'] as Block;
+    assert.equal(routed.servedUrl, site.url, 'served stays: no document was loaded');
+    assert.match(routed.shownUrl, /\/directions\?engine=foot/, 'shown moved');
+    assert.equal(routed.routesSinceServed, 1);
+
+    // THE FOUR SHAPES, in the order the probe sent them. Each is refused by
+    // the kind that names its address, loads nothing, and keeps the state.
+    const shapes: [string, string, string][] = [
+      ['the served address plus a fragment', `${site.url}#`, 'navigate_would_discard_shown_state'],
+      ['the served address', site.url, 'navigate_would_discard_shown_state'],
+      [
+        'a different path in the closure, no query',
+        `${site.url}elsewhere`,
+        'navigate_would_replace_served_document',
+      ],
+      [
+        'a different path plus a fragment',
+        `${site.url}elsewhere#map=4/40/-95`,
+        'navigate_would_replace_served_document',
+      ],
+      [
+        'a composed query on a known path',
+        `${site.url}directions?engine=car&route=9,9;8,8`,
+        'navigate_constructed_address',
+      ],
+    ];
+    for (const [label, url, kind] of shapes) {
+      const refused = await session.dispatch({ verb: 'navigate', url });
+      const rejected = refused['rejected'] as Rejected | undefined;
+      assert.equal(
+        rejected?.kind,
+        kind,
+        `${label}: expected ${kind}, got ${JSON.stringify(refused).slice(0, 400)}`,
+      );
+      assert.ok(
+        rejected.reason.includes(url) && rejected.reason.includes(routed.shownUrl),
+        `${label}: the reason names the address asked for and the shown one: ${rejected.reason}`,
+      );
+      assert.match(rejected.repair, /force/, `${label}: the repair says an override exists`);
+      assert.doesNotMatch(
+        rejected.repair,
+        /"force":\s*true/,
+        `${label}: the repair does not spell out the forced call`,
+      );
+      const still = await session.dispatch({ verb: 'read' });
+      assert.equal(
+        still['documentEpoch'],
+        reloaded['documentEpoch'],
+        `${label}: a refusal loads nothing`,
+      );
+      assert.equal(
+        (still['document'] as Block).shownUrl,
+        routed.shownUrl,
+        `${label}: the shown state is kept`,
+      );
+    }
+    // The different-path refusal says what a load would do to the SERVED record.
+    const other = await session.dispatch({ verb: 'navigate', url: `${site.url}elsewhere` });
+    const otherRejected = other['rejected'] as Rejected;
+    assert.ok(
+      otherRejected.reason.includes(site.url),
+      `the reason names the served document: ${otherRejected.reason}`,
+    );
+    assert.match(
+      otherRejected.reason,
+      /1 time\(s\) since/,
+      'the reason counts the routes since the served document',
+    );
+
+    // force:true is the model's decision, honoured verbatim and disclosed.
+    const forced = await session.dispatch({ verb: 'navigate', url: site.url, force: true });
+    assert.equal(forced['navigated'], true, JSON.stringify(forced).slice(0, 300));
+    assert.notEqual(
+      forced['documentEpoch'],
+      reloaded['documentEpoch'],
+      'a real load rolls the epoch',
+    );
+    const rep = forced['replaced'] as Block & { clientSideRoute: boolean; addressShown: boolean };
+    assert.equal(rep.clientSideRoute, true);
+    assert.equal(rep.shownUrl, routed.shownUrl, 'replaced names the state the load discarded');
+    const loaded = forced['document'] as Block;
+    assert.equal(loaded.servedUrl, site.url);
+    assert.equal(loaded.shownUrl, site.url, 'the shown state is gone');
+    assert.equal(loaded.routesSinceServed, 0);
+
+    // CONTROL: shown == served again, a load of a different path is admitted
+    // — the guard is on the condition, not a blanket on every navigate.
+    const admitted = await session.dispatch({ verb: 'navigate', url: `${site.url}elsewhere` });
+    assert.equal(
+      admitted['navigated'],
+      true,
+      `shown == served: a load of another path is not the losing move: ${JSON.stringify(admitted).slice(0, 300)}`,
+    );
+    const rep2 = admitted['replaced'] as { clientSideRoute: boolean };
+    assert.equal(rep2.clientSideRoute, false);
+    assert.equal((admitted['document'] as Block).servedUrl, `${site.url}elsewhere`);
+  } finally {
+    await session.close();
+    site.close();
+  }
+});

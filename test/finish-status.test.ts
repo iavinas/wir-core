@@ -11,11 +11,16 @@ import { WirSession } from '../src/session.js';
 
 test('not_found_error finish: evidence still required, empty answer allowed', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-nf-'));
-  writeFileSync(join(dir, 'a.html'),
-    '<!doctype html><title>a</title><h1>Reviews</h1><p>Great product, love it.</p>');
+  writeFileSync(
+    join(dir, 'a.html'),
+    '<!doctype html><title>a</title><h1>Reviews</h1><p>Great product, love it.</p>',
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   try {
@@ -26,13 +31,22 @@ test('not_found_error finish: evidence still required, empty answer allowed', as
     assert.ok(ref, JSON.stringify(overview).slice(0, 300));
 
     const bare = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [], status: 'not_found_error',
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [],
+      status: 'not_found_error',
     });
-    assert.equal((bare['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-      `"it isn't there" must still cite where the model looked: ${JSON.stringify(bare)}`);
+    assert.equal(
+      (bare['rejected'] as { kind: string } | undefined)?.kind,
+      'finish_rejected',
+      `"it isn't there" must still cite where the model looked: ${JSON.stringify(bare)}`,
+    );
 
     const cited = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [ref], status: 'not_found_error',
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [ref],
+      status: 'not_found_error',
     });
     assert.equal(cited['accepted'], true, JSON.stringify(cited));
     assert.equal(cited['status'], 'not_found_error');
@@ -49,11 +63,16 @@ test('not_found_error finish: evidence still required, empty answer allowed', as
 // with effect verdict verified" and a repair naming acts that cannot exist.
 test('MUTATE not_found_error: reachable, evidence-bound, and not a gate bypass', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-nfm-'));
-  writeFileSync(join(dir, 'a.html'),
-    '<!doctype html><title>a</title><h1>Members</h1><p>No members yet.</p>');
+  writeFileSync(
+    join(dir, 'a.html'),
+    '<!doctype html><title>a</title><h1>Members</h1><p>No members yet.</p>',
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   try {
@@ -63,23 +82,37 @@ test('MUTATE not_found_error: reachable, evidence-bound, and not a gate bypass',
     assert.ok(ref, JSON.stringify(overview).slice(0, 300));
 
     const bare = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [], status: 'not_found_error',
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [],
+      status: 'not_found_error',
     });
-    assert.equal((bare['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-      `the evidence bar is not waived on MUTATE either: ${JSON.stringify(bare)}`);
+    assert.equal(
+      (bare['rejected'] as { kind: string } | undefined)?.kind,
+      'finish_rejected',
+      `the evidence bar is not waived on MUTATE either: ${JSON.stringify(bare)}`,
+    );
     // Every rejection must name a reachable acceptance path (ADR-003). Sending
     // this claim to the act ledger is what the unreachable branch would have done.
     assert.match((bare['rejected'] as { repair: string }).repair, /where you looked/);
 
     // The MUTATE gate itself is untouched: no cited act and no status, still rejected.
     const noStatus = await session.dispatch({
-      verb: 'finish', answer: 'done', evidenceRefs: [ref],
+      verb: 'finish',
+      answer: 'done',
+      evidenceRefs: [ref],
     });
-    assert.equal((noStatus['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-      `not_found_error must not become a general MUTATE bypass: ${JSON.stringify(noStatus)}`);
+    assert.equal(
+      (noStatus['rejected'] as { kind: string } | undefined)?.kind,
+      'finish_rejected',
+      `not_found_error must not become a general MUTATE bypass: ${JSON.stringify(noStatus)}`,
+    );
 
     const cited = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [ref], status: 'not_found_error',
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [ref],
+      status: 'not_found_error',
     });
     assert.equal(cited['accepted'], true, JSON.stringify(cited));
     assert.equal(cited['mode'], 'MUTATE');

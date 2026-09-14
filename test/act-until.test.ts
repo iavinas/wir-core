@@ -81,29 +81,51 @@ const PAGE = `<!doctype html><title>until</title><h1>Fixture</h1>
 function serve(): Promise<{ server: Server; base: string }> {
   const server = createServer((req, res) => {
     if (req.url === '/slow') {
-      setTimeout(() => { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{}'); }, FETCH_MS);
+      setTimeout(() => {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end('{}');
+      }, FETCH_MS);
       return;
     }
-    res.writeHead(200, { 'content-type': 'text/html' }); res.end(PAGE);
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end(PAGE);
   });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => {
-    const addr = server.address() as { port: number };
-    resolve({ server, base: `http://127.0.0.1:${addr.port}` });
-  }));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number };
+      resolve({ server, base: `http://127.0.0.1:${addr.port}` });
+    }),
+  );
 }
 
-type Until = { declared: Record<string, unknown>; verdict: string; afterMs: number; observed: string };
+type Until = {
+  declared: Record<string, unknown>;
+  verdict: string;
+  afterMs: number;
+  observed: string;
+};
 type Effect = { verdict: string; evidence: string; delta: { after: string }; until?: Until };
 type Receipt = { requests: { url: string; status: number | null }[] };
 
 describe('until — the condition an act settles to', () => {
-  let server: Server; let base: string; let session: WirSession;
+  let server: Server;
+  let base: string;
+  let session: WirSession;
   before(async () => {
     ({ server, base } = await serve());
-    session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-      harPath: null, tracePath: null, debugScreenshots: false });
+    session = await WirSession.start({
+      headless: true,
+      expectedAction: 'RETRIEVE',
+      storageStatePath: null,
+      harPath: null,
+      tracePath: null,
+      debugScreenshots: false,
+    });
   });
-  after(async () => { await session.close(); await new Promise<void>(r => server.close(() => r())); });
+  after(async () => {
+    await session.close();
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   async function refOf(name: string, role?: string): Promise<string> {
     const found = await session.dispatch({ verb: 'find', name, ...(role ? { role } : {}) });
@@ -116,14 +138,22 @@ describe('until — the condition an act settles to', () => {
     await session.goto(`${base}/`);
     const ref = await refOf('Reveal the answer', 'button');
     const t0 = Date.now();
-    const acted = await session.dispatch({ verb: 'act', ref, action: 'click', until: { text: 'forty-two' } });
+    const acted = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'click',
+      until: { text: 'forty-two' },
+    });
     const wall = Date.now() - t0;
     const effect = acted['effect'] as Effect;
     assert.ok(effect.until, `no until block: ${JSON.stringify(acted)}`);
     assert.equal(effect.until.verdict, 'condition_met', JSON.stringify(effect.until));
     assert.deepEqual(effect.until.declared, { text: 'forty-two' });
     // Never before the words exist; not long after (one compile after the token moved).
-    assert.ok(effect.until.afterMs >= REVEAL_MS, `met before the text existed: ${effect.until.afterMs} ms`);
+    assert.ok(
+      effect.until.afterMs >= REVEAL_MS,
+      `met before the text existed: ${effect.until.afterMs} ms`,
+    );
     assert.ok(effect.until.afterMs < REVEAL_MS + 2_500, `met late: ${effect.until.afterMs} ms`);
     assert.ok(wall < REVEAL_MS + 4_000, `act wall ${wall} ms`);
     assert.match(effect.until.observed, /matched n_[0-9a-f]+ \(/);
@@ -138,14 +168,25 @@ describe('until — the condition an act settles to', () => {
   test('until.network "idle" is met after the fetch answers, and that answer is in the receipt', async () => {
     await session.goto(`${base}/`);
     const ref = await refOf('Reveal the answer', 'button');
-    const acted = await session.dispatch({ verb: 'act', ref, action: 'click', until: { network: 'idle' } });
+    const acted = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'click',
+      until: { network: 'idle' },
+    });
     const effect = acted['effect'] as Effect;
     assert.ok(effect.until, JSON.stringify(acted));
     assert.equal(effect.until.verdict, 'condition_met', JSON.stringify(effect.until));
-    assert.ok(effect.until.afterMs >= FETCH_MS + 500, `idle declared before the fetch could have answered: ${effect.until.afterMs} ms`);
-    assert.match(effect.until.observed, /no request of this act's window in flight, quiet since \+\d+ ms \(\d+ requests? recorded since dispatch\)/);
+    assert.ok(
+      effect.until.afterMs >= FETCH_MS + 500,
+      `idle declared before the fetch could have answered: ${effect.until.afterMs} ms`,
+    );
+    assert.match(
+      effect.until.observed,
+      /no request of this act's window in flight, quiet since \+\d+ ms \(\d+ requests? recorded since dispatch\)/,
+    );
     const receipt = acted['receipt'] as Receipt;
-    const slow = receipt.requests.find(r => r.url.endsWith('/slow'));
+    const slow = receipt.requests.find((r) => r.url.endsWith('/slow'));
     assert.ok(slow, `the fetch is not in the receipt: ${JSON.stringify(receipt)}`);
     assert.equal(slow.status, 200, 'the ledger stayed armed through the extension');
   });
@@ -153,11 +194,19 @@ describe('until — the condition an act settles to', () => {
   test('until.gone is met when the spinner label is removed', async () => {
     await session.goto(`${base}/`);
     const ref = await refOf('Reveal the answer', 'button');
-    const acted = await session.dispatch({ verb: 'act', ref, action: 'click', until: { gone: 'Loading the answer' } });
+    const acted = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'click',
+      until: { gone: 'Loading the answer' },
+    });
     const effect = acted['effect'] as Effect;
     assert.ok(effect.until, JSON.stringify(acted));
     assert.equal(effect.until.verdict, 'condition_met', JSON.stringify(effect.until));
-    assert.ok(effect.until.afterMs >= REVEAL_MS, `gone before it was removed: ${effect.until.afterMs} ms`);
+    assert.ok(
+      effect.until.afterMs >= REVEAL_MS,
+      `gone before it was removed: ${effect.until.afterMs} ms`,
+    );
     assert.match(effect.until.observed, /no rendered node carries "Loading the answer"/);
   });
 
@@ -165,15 +214,22 @@ describe('until — the condition an act settles to', () => {
     await session.goto(`${base}/`);
     const ref = await refOf('Reveal the answer', 'button');
     const t0 = Date.now();
-    const acted = await session.dispatch({ verb: 'act', ref, action: 'click',
-      until: { text: 'this text is not on the page zzqx', withinMs: 1_500 } });
+    const acted = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'click',
+      until: { text: 'this text is not on the page zzqx', withinMs: 1_500 },
+    });
     const wall = Date.now() - t0;
     const effect = acted['effect'] as Effect;
     assert.ok(effect.until, JSON.stringify(acted));
     assert.equal(effect.until.verdict, 'timed_out', JSON.stringify(effect.until));
     assert.ok(effect.until.afterMs >= 1_500, `gave up early: ${effect.until.afterMs} ms`);
     assert.ok(wall < 1_500 + 4_000, `held far past the bound: ${wall} ms`);
-    assert.match(effect.until.observed, /"this text is not on the page zzqx" in none of \d+ rendered nodes/);
+    assert.match(
+      effect.until.observed,
+      /"this text is not on the page zzqx" in none of \d+ rendered nodes/,
+    );
     assert.match(effect.until.observed, /at the bound; \d+ recompiles? of at most 30/);
     // A fact beside the verdict, never a contradiction of the act: the click
     // still did what it did.
@@ -185,20 +241,32 @@ describe('until — the condition an act settles to', () => {
     await session.goto(`${base}/`);
     const button = await refOf('Enable the option', 'button');
     const box = await refOf('Optional extra', 'checkbox');
-    const acted = await session.dispatch({ verb: 'act', ref: button, action: 'click',
-      until: { state: { ref: box, checked: true } } });
+    const acted = await session.dispatch({
+      verb: 'act',
+      ref: button,
+      action: 'click',
+      until: { state: { ref: box, checked: true } },
+    });
     const effect = acted['effect'] as Effect;
     assert.ok(effect.until, JSON.stringify(acted));
     assert.equal(effect.until.verdict, 'condition_met', JSON.stringify(effect.until));
-    assert.ok(effect.until.afterMs >= CHECK_MS, `checked before the page flipped it: ${effect.until.afterMs} ms`);
+    assert.ok(
+      effect.until.afterMs >= CHECK_MS,
+      `checked before the page flipped it: ${effect.until.afterMs} ms`,
+    );
     assert.match(effect.until.observed, new RegExp(`^${box} now reads checked=true$`));
   });
 
   test('scroll to the end with until.text keeps scrolling a feed that grows until the words appear', async () => {
     await session.goto(`${base}/`);
     const row = await refOf('Row one');
-    const acted = await session.dispatch({ verb: 'act', ref: row, action: 'scroll', value: 'end',
-      until: { text: 'zebra', withinMs: 8_000 } });
+    const acted = await session.dispatch({
+      verb: 'act',
+      ref: row,
+      action: 'scroll',
+      value: 'end',
+      until: { text: 'zebra', withinMs: 8_000 },
+    });
     const effect = acted['effect'] as Effect;
     assert.ok(effect.until, JSON.stringify(acted));
     assert.equal(effect.until.verdict, 'condition_met', JSON.stringify(effect.until));
@@ -210,30 +278,66 @@ describe('until — the condition an act settles to', () => {
     // condition was polled. Not "at the end": the words appeared mid-batch and
     // the extension stops the moment they do.
     assert.match(effect.delta.after, /rendered=40 /);
-    assert.ok(effect.until.afterMs >= 3 * FEED_MS, `three batches cannot have landed by ${effect.until.afterMs} ms`);
+    assert.ok(
+      effect.until.afterMs >= 3 * FEED_MS,
+      `three batches cannot have landed by ${effect.until.afterMs} ms`,
+    );
   });
 
   test('a malformed until is refused before dispatch, with the corrected call; no until, no block', async () => {
     await session.goto(`${base}/`);
     const ref = await refOf('Reveal the answer', 'button');
     // The garble a model produces: withinMs beside until instead of inside it.
-    const stray = await session.dispatch({ verb: 'act', ref, action: 'click',
-      until: { text: 'x' }, withinMs: 2000 } as unknown as Parameters<WirSession['dispatch']>[0]);
-    assert.equal((stray['rejected'] as { kind: string }).kind, 'invalid_args', JSON.stringify(stray));
+    const stray = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'click',
+      until: { text: 'x' },
+      withinMs: 2000,
+    } as unknown as Parameters<WirSession['dispatch']>[0]);
+    assert.equal(
+      (stray['rejected'] as { kind: string }).kind,
+      'invalid_args',
+      JSON.stringify(stray),
+    );
     assert.match((stray['rejected'] as { reason: string }).reason, /unknown key withinMs/);
-    const two = await session.dispatch({ verb: 'act', ref, action: 'click', until: { text: 'x', gone: 'y' } });
+    const two = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'click',
+      until: { text: 'x', gone: 'y' },
+    });
     assert.equal((two['rejected'] as { kind: string }).kind, 'invalid_args', JSON.stringify(two));
     assert.match((two['rejected'] as { reason: string }).reason, /2 conditions \(text, gone\)/);
-    assert.equal((two['rejected'] as { repair: string }).repair,
-      JSON.stringify({ verb: 'act', ref, action: 'click', until: { text: 'x' } }));
-    const tooLong = await session.dispatch({ verb: 'act', ref, action: 'click', until: { text: 'x', withinMs: 60_000 } });
+    assert.equal(
+      (two['rejected'] as { repair: string }).repair,
+      JSON.stringify({ verb: 'act', ref, action: 'click', until: { text: 'x' } }),
+    );
+    const tooLong = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'click',
+      until: { text: 'x', withinMs: 60_000 },
+    });
     assert.match((tooLong['rejected'] as { reason: string }).reason, /from 1 to 15000/);
     assert.match((tooLong['rejected'] as { repair: string }).repair, /"withinMs":15000/);
-    const scrollNet = await session.dispatch({ verb: 'act', ref, action: 'scroll', until: { network: 'idle' } });
-    assert.match((scrollNet['rejected'] as { reason: string }).reason, /scroll installs no network observers/);
+    const scrollNet = await session.dispatch({
+      verb: 'act',
+      ref,
+      action: 'scroll',
+      until: { network: 'idle' },
+    });
+    assert.match(
+      (scrollNet['rejected'] as { reason: string }).reason,
+      /scroll installs no network observers/,
+    );
     // Nothing was dispatched by any of those: the answer is still unrevealed.
     const still = await session.dispatch({ verb: 'find', name: 'forty-two' });
-    assert.equal((still['population'] as { matched: number }).matched, 0, JSON.stringify(still).slice(0, 200));
+    assert.equal(
+      (still['population'] as { matched: number }).matched,
+      0,
+      JSON.stringify(still).slice(0, 200),
+    );
     // And an act with no until carries no until block.
     const plain = await session.dispatch({ verb: 'act', ref, action: 'click' });
     assert.equal((plain['effect'] as Effect).until, undefined, JSON.stringify(plain['effect']));

@@ -38,7 +38,9 @@ test('visible labels preserve the state of hidden checkbox/radio controls', asyn
   const dir = mkdtempSync(join(tmpdir(), 'wir-hidden-control-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${join(dir, 'a.html')}`);
@@ -48,18 +50,30 @@ test('visible labels preserve the state of hidden checkbox/radio controls', asyn
     // Five label-backed hidden radios plus the one ordinary visible radio. The
     // visible radio's label is not projected as a second control.
     assert.equal(radios.length, 6, JSON.stringify(found));
-    const styled = radios.filter(r => String(r['controlId'] ?? '').startsWith('Rating_'));
+    const styled = radios.filter((r) => String(r['controlId'] ?? '').startsWith('Rating_'));
     assert.equal(styled.length, 5, JSON.stringify(found));
-    assert.deepEqual(styled.map(r => r['controlId']),
-      ['Rating_5', 'Rating_4', 'Rating_3', 'Rating_2', 'Rating_1']);
-    assert.deepEqual(styled.map(r => r['value']), ['20', '19', '18', '17', '16']);
-    assert.deepEqual(styled.filter(r => (r['state'] as Record<string, unknown> | undefined)?.['checked'])
-      .map(r => r['controlId']), ['Rating_3']);
+    assert.deepEqual(
+      styled.map((r) => r['controlId']),
+      ['Rating_5', 'Rating_4', 'Rating_3', 'Rating_2', 'Rating_1'],
+    );
+    assert.deepEqual(
+      styled.map((r) => r['value']),
+      ['20', '19', '18', '17', '16'],
+    );
+    assert.deepEqual(
+      styled
+        .filter((r) => (r['state'] as Record<string, unknown> | undefined)?.['checked'])
+        .map((r) => r['controlId']),
+      ['Rating_3'],
+    );
 
     const boxes = await session.dispatch({ verb: 'find', role: 'checkbox', limit: 20 });
-    const wrapped = ((boxes['matches'] ?? []) as Record<string, unknown>[])
-      .find(r => r['controlId'] === 'wrapped');
+    const wrapped = ((boxes['matches'] ?? []) as Record<string, unknown>[]).find(
+      (r) => r['controlId'] === 'wrapped',
+    );
     assert.ok(wrapped, JSON.stringify(boxes));
     assert.equal((wrapped['state'] as Record<string, unknown>)['checked'], true);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });

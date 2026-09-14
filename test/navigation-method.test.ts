@@ -28,17 +28,21 @@ const PAGE = `<!doctype html><title>a</title><h1>Host</h1>
 function serve(): Promise<{ server: Server; base: string }> {
   const server = createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/submit') {
-      res.writeHead(302, { location: '/done' }); res.end(); return;
+      res.writeHead(302, { location: '/done' });
+      res.end();
+      return;
     }
-    const body = req.url === '/'
-      ? PAGE
-      : `<!doctype html><title>${req.url}</title><h1>Page ${req.url}</h1>`;
-    res.writeHead(200, { 'content-type': 'text/html' }); res.end(body);
+    const body =
+      req.url === '/' ? PAGE : `<!doctype html><title>${req.url}</title><h1>Page ${req.url}</h1>`;
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end(body);
   });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => {
-    const addr = server.address() as { port: number };
-    resolve({ server, base: `http://127.0.0.1:${addr.port}` });
-  }));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number };
+      resolve({ server, base: `http://127.0.0.1:${addr.port}` });
+    }),
+  );
 }
 
 async function clickByName(session: WirSession, name: string): Promise<Record<string, unknown>> {
@@ -54,14 +58,17 @@ function artifactPaths(): { harPath: string; tracePath: string } {
 }
 
 function closeServer(server: Server): Promise<void> {
-  return new Promise(resolve => server.close(() => resolve()));
+  return new Promise((resolve) => server.close(() => resolve()));
 }
 
 test('a script GET navigation reads navigation_get and cannot prove a mutation', async () => {
   const { server, base } = await serve();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
-    ...artifactPaths(), debugScreenshots: false,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    ...artifactPaths(),
+    debugScreenshots: false,
   });
   try {
     await session.goto(`${base}/`);
@@ -71,10 +78,15 @@ test('a script GET navigation reads navigation_get and cannot prove a mutation',
     assert.equal(effect.verdict, 'verified');
 
     const finish = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [acted['actRef'] as string],
     });
-    assert.equal((finish['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-      `an observed GET must not prove a mutation: ${JSON.stringify(finish)}`);
+    assert.equal(
+      (finish['rejected'] as { kind: string } | undefined)?.kind,
+      'finish_rejected',
+      `an observed GET must not prove a mutation: ${JSON.stringify(finish)}`,
+    );
   } finally {
     await session.close();
     await closeServer(server);
@@ -84,8 +96,11 @@ test('a script GET navigation reads navigation_get and cannot prove a mutation',
 test('a form POST reads navigation_post and satisfies the MUTATE gate', async () => {
   const { server, base } = await serve();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
-    ...artifactPaths(), debugScreenshots: false,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    ...artifactPaths(),
+    debugScreenshots: false,
   });
   try {
     await session.goto(`${base}/`);
@@ -95,10 +110,15 @@ test('a form POST reads navigation_post and satisfies the MUTATE gate', async ()
     assert.equal(effect.verdict, 'verified');
 
     const finish = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [acted['actRef'] as string],
     });
-    assert.equal(finish['accepted'], true,
-      `an observed POST is mutation proof: ${JSON.stringify(finish)}`);
+    assert.equal(
+      finish['accepted'],
+      true,
+      `an observed POST is mutation proof: ${JSON.stringify(finish)}`,
+    );
   } finally {
     await session.close();
     await closeServer(server);
@@ -108,23 +128,38 @@ test('a form POST reads navigation_post and satisfies the MUTATE gate', async ()
 test('a pushState route cannot mint gate-eligible navigation (review B1)', async () => {
   const { server, base } = await serve();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
-    ...artifactPaths(), debugScreenshots: false,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    ...artifactPaths(),
+    debugScreenshots: false,
   });
   try {
     await session.goto(`${base}/`);
     const acted = await clickByName(session, 'Save client-side');
-    const effect = acted['effect'] as { verdict: string; evidence: string; delta: { after: string } };
-    assert.notEqual(effect.evidence, 'navigation',
-      `zero bytes reached the server; this must not read as navigation: ${JSON.stringify(acted)}`);
+    const effect = acted['effect'] as {
+      verdict: string;
+      evidence: string;
+      delta: { after: string };
+    };
+    assert.notEqual(
+      effect.evidence,
+      'navigation',
+      `zero bytes reached the server; this must not read as navigation: ${JSON.stringify(acted)}`,
+    );
     assert.equal(effect.evidence, 'dom_mutated', JSON.stringify(acted));
     assert.match(effect.delta.after, /without document replacement/);
 
     const finish = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [acted['actRef'] as string],
     });
-    assert.equal((finish['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-      `a client-side route must not prove a mutation: ${JSON.stringify(finish)}`);
+    assert.equal(
+      (finish['rejected'] as { kind: string } | undefined)?.kind,
+      'finish_rejected',
+      `a client-side route must not prove a mutation: ${JSON.stringify(finish)}`,
+    );
   } finally {
     await session.close();
     await closeServer(server);

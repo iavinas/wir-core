@@ -48,13 +48,18 @@ const WINDOWED_EDITOR = `<!doctype html><title>ed</title><h1>Host</h1>
 
 const PAYLOAD = '<!doctype html>\n<title>replaced</title>\n<h1>whole document</h1>\n';
 
-async function startOn(html: string, expectedAction: 'RETRIEVE' | 'MUTATE' = 'RETRIEVE'):
-    Promise<{ session: WirSession; dir: string }> {
+async function startOn(
+  html: string,
+  expectedAction: 'RETRIEVE' | 'MUTATE' = 'RETRIEVE',
+): Promise<{ session: WirSession; dir: string }> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-typing-'));
   writeFileSync(join(dir, 'a.html'), html);
   const session = await WirSession.start({
-    headless: true, expectedAction, storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction,
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   await session.goto(`file://${dir}/a.html`);
@@ -79,9 +84,15 @@ test('type replaces the WHOLE model of a windowed editor, newlines intact', asyn
     // Ground truth, the probe-oracle way: the page's own model, not WIR's view.
     // (String form: a top-level `let` lives in the global lexical environment,
     // not on globalThis, and is only reachable by name.)
-    const model = await session.host.page.evaluate('model') as string;
-    assert.equal(model, PAYLOAD, 'the chord must reach the page\'s keyboard layer and replace the whole model');
-  } finally { await session.close(); }
+    const model = (await session.host.page.evaluate('model')) as string;
+    assert.equal(
+      model,
+      PAYLOAD,
+      "the chord must reach the page's keyboard layer and replace the whole model",
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('type on the windowed editor never minted contradicted (the 442 comparator scar)', async () => {
@@ -93,7 +104,9 @@ test('type on the windowed editor never minted contradicted (the 442 comparator 
     // The window (3 lines) can never equal the payload; equality is not type's
     // contract and contradicted must be impossible on this path.
     assert.notEqual(effect.verdict, 'contradicted', JSON.stringify(acted));
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('fill on the same windowed editor still honestly reads contradicted/value_mismatch', async () => {
@@ -106,7 +119,9 @@ test('fill on the same windowed editor still honestly reads contradicted/value_m
     // selects only the window, the model splices, and readback mismatches.
     assert.equal(effect.verdict, 'contradicted', JSON.stringify(acted));
     assert.equal(effect.evidence, 'value_mismatch');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('type on a plain textarea replaces the whole value via the fallback', async () => {
@@ -118,10 +133,11 @@ test('type on a plain textarea replaces the whole value via the fallback', async
     const effect = acted['effect'] as { verdict: string; evidence: string };
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     assert.equal(effect.evidence, 'text_typed');
-    const value = await session.host.page.evaluate(() =>
-      document.querySelector('textarea')?.value);
+    const value = await session.host.page.evaluate(() => document.querySelector('textarea')?.value);
     assert.equal(value, PAYLOAD, 'replace-the-content, never insert-at-caret');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('MUTATE finish citing only a text_typed act is rejected (LOCAL_ONLY at birth)', async () => {
@@ -132,10 +148,17 @@ test('MUTATE finish citing only a text_typed act is rejected (LOCAL_ONLY at birt
     const effect = acted['effect'] as { verdict: string; evidence: string };
     assert.equal(effect.evidence, 'text_typed', JSON.stringify(acted));
     const finish = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [acted['actRef'] as string],
     });
     const rejected = finish['rejected'] as { kind: string } | undefined;
-    assert.equal(rejected?.kind, 'finish_rejected',
-      `typing proves the browser holds text, never that the site changed: ${JSON.stringify(finish)}`);
-  } finally { await session.close(); }
+    assert.equal(
+      rejected?.kind,
+      'finish_rejected',
+      `typing proves the browser holds text, never that the site changed: ${JSON.stringify(finish)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

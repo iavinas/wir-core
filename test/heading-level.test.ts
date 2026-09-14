@@ -33,24 +33,38 @@ test('the heading list carries the level that makes it an outline', async () => 
   const dir = mkdtempSync(join(tmpdir(), 'wir-outline-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
     const headings = (overview['headings'] ?? []) as { name: string; level?: number }[];
-    const levelOf = new Map(headings.map(h => [h.name, h.level]));
+    const levelOf = new Map(headings.map((h) => [h.name, h.level]));
 
-    for (const [name, want] of [['top one', 1], ['section two', 2], ['deep four', 4],
-      ['deepest six', 6]] as [string, number][]) {
-      assert.equal(levelOf.get(name), want,
-        `"${name}" must report level ${want}: ${JSON.stringify(headings)}`);
+    for (const [name, want] of [
+      ['top one', 1],
+      ['section two', 2],
+      ['deep four', 4],
+      ['deepest six', 6],
+    ] as [string, number][]) {
+      assert.equal(
+        levelOf.get(name),
+        want,
+        `"${name}" must report level ${want}: ${JSON.stringify(headings)}`,
+      );
     }
 
     // The ARIA heading is the case a tag-derived level would have missed.
-    assert.equal(levelOf.get('aria three'), 3,
-      `an aria-level heading must carry its level: ${JSON.stringify(headings)}`);
-  } finally { await session.close(); }
+    assert.equal(
+      levelOf.get('aria three'),
+      3,
+      `an aria-level heading must carry its level: ${JSON.stringify(headings)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('a non-heading carries no level', async () => {
@@ -58,18 +72,26 @@ test('a non-heading carries no level', async () => {
   // `level` for list items and tree items too, so gating on the heading role is
   // load-bearing, not decoration.
   const dir = mkdtempSync(join(tmpdir(), 'wir-outline-neg-'));
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>neg</title>
-    <main><h2>a heading</h2><ul><li>an item</li><li>another item</li></ul></main>`);
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>neg</title>
+    <main><h2>a heading</h2><ul><li>an item</li><li>another item</li></ul></main>`,
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
     const headings = (overview['headings'] ?? []) as { name: string; level?: number }[];
-    assert.ok(!headings.some(h => h.name === 'an item'),
-      `a list item is not a heading: ${JSON.stringify(headings)}`);
-    assert.equal(headings.find(h => h.name === 'a heading')?.level, 2,
-      JSON.stringify(headings));
-  } finally { await session.close(); }
+    assert.ok(
+      !headings.some((h) => h.name === 'an item'),
+      `a list item is not a heading: ${JSON.stringify(headings)}`,
+    );
+    assert.equal(headings.find((h) => h.name === 'a heading')?.level, 2, JSON.stringify(headings));
+  } finally {
+    await session.close();
+  }
 });

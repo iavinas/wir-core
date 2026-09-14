@@ -42,41 +42,67 @@ function serve(): Promise<{ server: Server; base: string }> {
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end(PAGE);
   });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => {
-    const addr = server.address() as { port: number };
-    resolve({ server, base: `http://127.0.0.1:${addr.port}` });
-  }));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number };
+      resolve({ server, base: `http://127.0.0.1:${addr.port}` });
+    }),
+  );
 }
 
-async function selectByName(session: WirSession, name: string, value: string):
-    Promise<{ verdict: string; evidence: string; delta: { before: string; after: string } }> {
-  const found = await session.dispatch({ verb: 'find', name }) as
-    { matches?: { ref: string }[] };
+async function selectByName(
+  session: WirSession,
+  name: string,
+  value: string,
+): Promise<{ verdict: string; evidence: string; delta: { before: string; after: string } }> {
+  const found = (await session.dispatch({ verb: 'find', name })) as { matches?: { ref: string }[] };
   const ref = found.matches?.[0]?.ref;
   assert.ok(ref, `find ${JSON.stringify(name)} returned a match`);
-  const acted = await session.dispatch({ verb: 'act', ref, action: 'select', value }) as
-    { effect?: { verdict: string; evidence: string; delta: { before: string; after: string } };
-      rejected?: unknown };
-  assert.equal(acted.rejected, undefined, `select was not rejected: ${JSON.stringify(acted.rejected)}`);
+  const acted = (await session.dispatch({ verb: 'act', ref, action: 'select', value })) as {
+    effect?: { verdict: string; evidence: string; delta: { before: string; after: string } };
+    rejected?: unknown;
+  };
+  assert.equal(
+    acted.rejected,
+    undefined,
+    `select was not rejected: ${JSON.stringify(acted.rejected)}`,
+  );
   assert.ok(acted.effect, 'select returned an effect');
-  return acted.effect as { verdict: string; evidence: string; delta: { before: string; after: string } };
+  return acted.effect as {
+    verdict: string;
+    evidence: string;
+    delta: { before: string; after: string };
+  };
 }
 
 test('a select the page reverts during the settle contradicts, and says both readings', async () => {
   const { server, base } = await serve();
-  const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-    storageStatePath: null, harPath: null, tracePath: null, debugScreenshots: false });
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
+  });
   try {
     await session.goto(`${base}/`);
     const effect = await selectByName(session, 'Shipping method', 'Express');
-    assert.notEqual(effect.verdict, 'verified',
-      `a reverted select must never read verified (got ${effect.verdict}/${effect.evidence})`);
+    assert.notEqual(
+      effect.verdict,
+      'verified',
+      `a reverted select must never read verified (got ${effect.verdict}/${effect.evidence})`,
+    );
     assert.equal(effect.verdict, 'contradicted');
     assert.equal(effect.evidence, 'selection_mismatch');
-    assert.ok(effect.delta.after.includes('value=""'),
-      `the delta reads the settled page: ${effect.delta.after}`);
-    assert.ok(effect.delta.after.includes('the page reverted it during the settle'),
-      `the delta keeps the write-time reading: ${effect.delta.after}`);
+    assert.ok(
+      effect.delta.after.includes('value=""'),
+      `the delta reads the settled page: ${effect.delta.after}`,
+    );
+    assert.ok(
+      effect.delta.after.includes('the page reverted it during the settle'),
+      `the delta keeps the write-time reading: ${effect.delta.after}`,
+    );
   } finally {
     await session.close().catch(() => undefined);
     server.close();
@@ -85,8 +111,14 @@ test('a select the page reverts during the settle contradicts, and says both rea
 
 test('a select the page accepts keeps its verdict (control)', async () => {
   const { server, base } = await serve();
-  const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-    storageStatePath: null, harPath: null, tracePath: null, debugScreenshots: false });
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
+  });
   try {
     await session.goto(`${base}/`);
     const effect = await selectByName(session, 'Colour', 'Blue');

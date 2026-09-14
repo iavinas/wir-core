@@ -28,57 +28,73 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
-const PAGE = '<!doctype html><title>structured</title>'
-  + '<label for="d">Birth date</label><input id="d" type="date">'
-  + '<label for="t">Plain text</label><input id="t" type="text">';
+const PAGE =
+  '<!doctype html><title>structured</title>' +
+  '<label for="d">Birth date</label><input id="d" type="date">' +
+  '<label for="t">Plain text</label><input id="t" type="text">';
 
-test('fill sets a date input, and refuses to fake it when the format is wrong',
-  async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'wir-struct-'));
-    writeFileSync(join(dir, 'a.html'), PAGE);
+test('fill sets a date input, and refuses to fake it when the format is wrong', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wir-struct-'));
+  writeFileSync(join(dir, 'a.html'), PAGE);
 
-    const session = await WirSession.start({
-      headless: true, expectedAction: 'MUTATE', storageStatePath: null });
-    try {
-      await session.goto(`file://${join(dir, 'a.html')}`);
-      await session.dispatch({ verb: 'read' });
-
-      const refFor = async (name: string) => {
-        const f = await session.dispatch({ verb: 'find', name }) as Record<string, any>;
-        return f['matches']?.[0]?.ref as string;
-      };
-      const domValue = (id: string) => session.host.page.evaluate(
-        (i) => (document.getElementById(i) as HTMLInputElement).value, id);
-
-      // 1. ISO goes in, and the act says so truthfully.
-      const dateRef = await refFor('Birth date');
-      assert.ok(dateRef, 'the date input is findable by its label');
-      const ok = await session.dispatch(
-        { verb: 'act', ref: dateRef, action: 'fill', value: '1990-05-15' }) as Record<string, any>;
-      assert.equal(ok['effect']?.verdict, 'verified', JSON.stringify(ok));
-      assert.equal(await domValue('d'), '1990-05-15', 'the value actually landed');
-
-      // 2. THE CONTROL. A format the input cannot accept must be CONTRADICTED —
-      //    the digit-key route would have stored a plausible wrong date instead.
-      await session.host.page.evaluate(() => {
-        (document.getElementById('d') as HTMLInputElement).value = '';
-      });
-      await session.dispatch({ verb: 'read' });
-      const bad = await session.dispatch(
-        { verb: 'act', ref: await refFor('Birth date'), action: 'fill', value: '15/05/1990' },
-      ) as Record<string, any>;
-      assert.equal(bad['effect']?.verdict, 'contradicted',
-        `a value the input cannot hold must not report success: ${JSON.stringify(bad)}`);
-      assert.equal(await domValue('d'), '', 'and nothing is stored');
-
-      // 3. An ordinary text input still goes through the keystroke path untouched.
-      await session.dispatch({ verb: 'read' });
-      const textOk = await session.dispatch(
-        { verb: 'act', ref: await refFor('Plain text'), action: 'fill', value: 'hello' },
-      ) as Record<string, any>;
-      assert.equal(textOk['effect']?.verdict, 'verified', JSON.stringify(textOk));
-      assert.equal(await domValue('t'), 'hello');
-    } finally {
-      await session.close();
-    }
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
+  try {
+    await session.goto(`file://${join(dir, 'a.html')}`);
+    await session.dispatch({ verb: 'read' });
+
+    const refFor = async (name: string) => {
+      const f = (await session.dispatch({ verb: 'find', name })) as Record<string, any>;
+      return f['matches']?.[0]?.ref as string;
+    };
+    const domValue = (id: string) =>
+      session.host.page.evaluate((i) => (document.getElementById(i) as HTMLInputElement).value, id);
+
+    // 1. ISO goes in, and the act says so truthfully.
+    const dateRef = await refFor('Birth date');
+    assert.ok(dateRef, 'the date input is findable by its label');
+    const ok = (await session.dispatch({
+      verb: 'act',
+      ref: dateRef,
+      action: 'fill',
+      value: '1990-05-15',
+    })) as Record<string, any>;
+    assert.equal(ok['effect']?.verdict, 'verified', JSON.stringify(ok));
+    assert.equal(await domValue('d'), '1990-05-15', 'the value actually landed');
+
+    // 2. THE CONTROL. A format the input cannot accept must be CONTRADICTED —
+    //    the digit-key route would have stored a plausible wrong date instead.
+    await session.host.page.evaluate(() => {
+      (document.getElementById('d') as HTMLInputElement).value = '';
+    });
+    await session.dispatch({ verb: 'read' });
+    const bad = (await session.dispatch({
+      verb: 'act',
+      ref: await refFor('Birth date'),
+      action: 'fill',
+      value: '15/05/1990',
+    })) as Record<string, any>;
+    assert.equal(
+      bad['effect']?.verdict,
+      'contradicted',
+      `a value the input cannot hold must not report success: ${JSON.stringify(bad)}`,
+    );
+    assert.equal(await domValue('d'), '', 'and nothing is stored');
+
+    // 3. An ordinary text input still goes through the keystroke path untouched.
+    await session.dispatch({ verb: 'read' });
+    const textOk = (await session.dispatch({
+      verb: 'act',
+      ref: await refFor('Plain text'),
+      action: 'fill',
+      value: 'hello',
+    })) as Record<string, any>;
+    assert.equal(textOk['effect']?.verdict, 'verified', JSON.stringify(textOk));
+    assert.equal(await domValue('t'), 'hello');
+  } finally {
+    await session.close();
+  }
+});

@@ -36,11 +36,12 @@ const PAGE = `<!doctype html><title>disabled</title>
   <a href="#x" disabled>anchor with disabled attribute</a>
 </main>`;
 
-async function stateOf(session: WirSession, name: string):
-Promise<{ ref: string; state: Record<string, unknown> }> {
+async function stateOf(
+  session: WirSession,
+  name: string,
+): Promise<{ ref: string; state: Record<string, unknown> }> {
   const found = await session.dispatch({ verb: 'find', name });
-  const m = ((found['matches'] ?? []) as
-    { ref: string; state?: Record<string, unknown> }[])[0];
+  const m = ((found['matches'] ?? []) as { ref: string; state?: Record<string, unknown> }[])[0];
   assert.ok(m, `${JSON.stringify(name)} not found: ${JSON.stringify(found)}`);
   return { ref: m.ref, state: m.state ?? {} };
 }
@@ -49,25 +50,34 @@ test('every route to disabled is visible before acting', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-disabled-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
 
     for (const name of ['attribute disabled', 'aria disabled', 'fieldset disabled']) {
       const { state } = await stateOf(session, name);
-      assert.equal(state['disabled'], true,
-        `"${name}" must be shown as disabled before act refuses it: ${JSON.stringify(state)}`);
+      assert.equal(
+        state['disabled'],
+        true,
+        `"${name}" must be shown as disabled before act refuses it: ${JSON.stringify(state)}`,
+      );
     }
 
     // And the enabled ones are untouched — a fix that marks everything disabled
     // would pass every assertion above.
     for (const name of ['plain enabled', 'anchor with disabled attribute']) {
       const live = await stateOf(session, name);
-      assert.ok(!('disabled' in live.state),
-        `"${name}" is live and must not be marked disabled: ${JSON.stringify(live.state)}`);
+      assert.ok(
+        !('disabled' in live.state),
+        `"${name}" is live and must not be marked disabled: ${JSON.stringify(live.state)}`,
+      );
     }
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('what read shows and what act refuses are the same set', async () => {
@@ -76,19 +86,31 @@ test('what read shows and what act refuses are the same set', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-disabled-act-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
-    for (const name of ['plain enabled', 'attribute disabled', 'aria disabled',
-      'fieldset disabled', 'anchor with disabled attribute']) {
+    for (const name of [
+      'plain enabled',
+      'attribute disabled',
+      'aria disabled',
+      'fieldset disabled',
+      'anchor with disabled attribute',
+    ]) {
       const { ref, state } = await stateOf(session, name);
       const said = state['disabled'] === true;
       const acted = await session.dispatch({ verb: 'act', ref, action: 'click' });
       const refused = /disabled/.test(JSON.stringify(acted['rejected'] ?? ''));
-      assert.equal(refused, said,
+      assert.equal(
+        refused,
+        said,
         `"${name}": read said disabled=${said}, act ${refused ? 'refused' : 'accepted'} — ` +
-        `${JSON.stringify(acted).slice(0, 200)}`);
+          `${JSON.stringify(acted).slice(0, 200)}`,
+      );
     }
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });

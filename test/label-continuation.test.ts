@@ -34,14 +34,16 @@ const body = (n: number): string =>
 
 const LIST = `<!doctype html><title>list</title>
 <main><ul>
-  ${[1, 2, 3].map(n => `<li><span>${body(n)}</span><button>Reply ${n}</button></li>`).join('\n  ')}
+  ${[1, 2, 3].map((n) => `<li><span>${body(n)}</span><button>Reply ${n}</button></li>`).join('\n  ')}
 </ul></main>`;
 
 test('a truncated item label carries a continuation that reaches the next characters', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-label-'));
   writeFileSync(join(dir, 'a.html'), LIST);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -52,8 +54,11 @@ test('a truncated item label carries a continuation that reaches the next charac
     const label = match.item.label;
 
     // 1. The cut is declared, not silent.
-    assert.match(label, /…\[\+\d+ chars: /,
-      `a cut label must say it was cut: ${JSON.stringify(label)}`);
+    assert.match(
+      label,
+      /…\[\+\d+ chars: /,
+      `a cut label must say it was cut: ${JSON.stringify(label)}`,
+    );
 
     // 2. The continuation is a literal next call, and it parses.
     const m = /: (\{.*\})\]$/.exec(label);
@@ -80,33 +85,46 @@ test('a truncated item label carries a continuation that reaches the next charac
       call = m ? (JSON.parse(m[1]!) as Record<string, unknown>) : null;
     }
     for (const k of [0, 5, 11]) {
-      assert.ok(seen.includes(`item1part${k}`),
-        `part ${k} is unreachable through the label's continuation chain`);
+      assert.ok(
+        seen.includes(`item1part${k}`),
+        `part ${k} is unreachable through the label's continuation chain`,
+      );
     }
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('a short item label is served whole, with no marker', async () => {
   // The other half: `bounded` must not decorate text that fits. A marker on a
   // complete string is its own lie, and "complete" may appear only when true.
   const dir = mkdtempSync(join(tmpdir(), 'wir-label-short-'));
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>short</title>
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>short</title>
     <main><ul>
       <li><span>alpha</span><button>Reply 1</button></li>
       <li><span>beta</span><button>Reply 2</button></li>
       <li><span>gamma</span><button>Reply 3</button></li>
-    </ul></main>`);
+    </ul></main>`,
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const found = await session.dispatch({ verb: 'find', name: 'Reply 2' });
     const match = ((found['matches'] ?? []) as { item?: { label: string } }[])[0];
     assert.ok(match?.item, JSON.stringify(found));
-    assert.ok(!/…\[\+/.test(match.item.label),
-      `an item that fits must not be marked as cut: ${JSON.stringify(match.item.label)}`);
-  } finally { await session.close(); }
+    assert.ok(
+      !/…\[\+/.test(match.item.label),
+      `an item that fits must not be marked as cut: ${JSON.stringify(match.item.label)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 // One node's text must have ONE pagination chain.
@@ -125,11 +143,16 @@ test('a label and a content bound do not mint two chains for one node', async ()
   const dir = mkdtempSync(join(tmpdir(), 'wir-chains-'));
   const body = (n: number): string =>
     Array.from({ length: 120 }, (_, k) => `item${n}part${k}`).join(' ');
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>chains</title><main><ul>${
-    [1, 2].map(n => `<li><span>${body(n)}</span><button>Reply ${n}</button></li>`).join('')
-  }</ul></main>`);
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>chains</title><main><ul>${[1, 2]
+      .map((n) => `<li><span>${body(n)}</span><button>Reply ${n}</button></li>`)
+      .join('')}</ul></main>`,
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -145,8 +168,11 @@ test('a label and a content bound do not mint two chains for one node', async ()
       byNode.set(m[1]!, [...(byNode.get(m[1]!) ?? []), cursor]);
     }
     for (const [ref, cursors] of byNode) {
-      assert.equal(cursors.length, 1,
-        `node ${ref} has ${cursors.length} text chains: ${cursors.join(', ')}`);
+      assert.equal(
+        cursors.length,
+        1,
+        `node ${ref} has ${cursors.length} text chains: ${cursors.join(', ')}`,
+      );
     }
 
     // And the label's own offer must deliver, then be consumed.
@@ -156,9 +182,15 @@ test('a label and a content bound do not mint two chains for one node', async ()
     assert.ok(call, `a cut label must carry a callable continuation: ${item.label}`);
     const r = await session.dispatch(JSON.parse(call[1]!) as never);
     const text = JSON.stringify(r);
-    assert.ok(text.includes('item1part0') && text.includes('item1part119'),
-      `the label's continuation must deliver the item's text: ${text.slice(0, 200)}`);
-    assert.ok(!session.unconsumedContinuations().some(o => o.call === call[1]),
-      'following the label offer must consume it');
-  } finally { await session.close(); }
+    assert.ok(
+      text.includes('item1part0') && text.includes('item1part119'),
+      `the label's continuation must deliver the item's text: ${text.slice(0, 200)}`,
+    );
+    assert.ok(
+      !session.unconsumedContinuations().some((o) => o.call === call[1]),
+      'following the label offer must consume it',
+    );
+  } finally {
+    await session.close();
+  }
 });

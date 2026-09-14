@@ -25,14 +25,17 @@ const fixture = (name: string, html: string): string => {
 };
 
 test('same-document growth is never re-served as live stale content', async () => {
-  const url = fixture('lazy.html', `<!doctype html><title>lazy</title><h1>Feed</h1><ul id="l"></ul><script>
+  const url = fixture(
+    'lazy.html',
+    `<!doctype html><title>lazy</title><h1>Feed</h1><ul id="l"></ul><script>
 let n = 0;
 const add = () => { for (let i = 0; i < 20; i++) {
   const li = document.createElement('li');
   li.innerHTML = '<a href="/p' + (++n) + '">Post number ' + n + '</a>';
   document.getElementById('l').appendChild(li); } };
 add(); setTimeout(add, 400);
-</script>`);
+</script>`,
+  );
 
   const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE' });
   try {
@@ -48,14 +51,26 @@ add(); setTimeout(add, 400);
     assert.equal(unchanged['controlsTotal'], 20);
 
     // The page grows on its own timer: no navigation, no act, same epoch.
-    await session.host.page.waitForFunction(() => document.querySelectorAll('a[href]').length === 40);
+    await session.host.page.waitForFunction(
+      () => document.querySelectorAll('a[href]').length === 40,
+    );
     const grown = await session.dispatch({ verb: 'read' });
 
-    assert.equal(grown['documentEpoch'], first['documentEpoch'], 'growth must not fake a new document');
-    assert.equal(grown['controlsTotal'], 40,
-      `the runtime saw 40 links and returned ${String(grown['controlsTotal'])}: ${JSON.stringify(grown)}`);
-    assert.notEqual(grown['freshness'], 'live',
-      `a result compiled before the growth may never be stamped live: ${JSON.stringify(grown)}`);
+    assert.equal(
+      grown['documentEpoch'],
+      first['documentEpoch'],
+      'growth must not fake a new document',
+    );
+    assert.equal(
+      grown['controlsTotal'],
+      40,
+      `the runtime saw 40 links and returned ${String(grown['controlsTotal'])}: ${JSON.stringify(grown)}`,
+    );
+    assert.notEqual(
+      grown['freshness'],
+      'live',
+      `a result compiled before the growth may never be stamped live: ${JSON.stringify(grown)}`,
+    );
   } finally {
     await session.close();
   }
@@ -67,18 +82,24 @@ test('a document holding shadow content is never vouched for as live', async () 
   // a MutationObserver reaches neither, and arming roots as they are added cannot
   // fix it (attachShadow follows insertion and emits no record). The graph must
   // therefore refuse to be cached, or `live` would be a lie on any such page.
-  const url = fixture('shadow.html', `<!doctype html><title>shadow</title><h1>Host</h1>
+  const url = fixture(
+    'shadow.html',
+    `<!doctype html><title>shadow</title><h1>Host</h1>
 <a href="/light">Light link</a><div id="h"></div><script>
 document.getElementById('h').attachShadow({ mode: 'open' }).innerHTML =
   '<a href="/s1">Shadow link one</a>';
-</script>`);
+</script>`,
+  );
 
   const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE' });
   try {
     await session.goto(url);
     const links = await session.dispatch({ verb: 'find', role: 'link' });
-    const names = (links['matches'] as { name: string }[]).map(m => m.name);
-    assert.ok(names.includes('Shadow link one'), `shadow content is compiled: ${JSON.stringify(names)}`);
+    const names = (links['matches'] as { name: string }[]).map((m) => m.name);
+    assert.ok(
+      names.includes('Shadow link one'),
+      `shadow content is compiled: ${JSON.stringify(names)}`,
+    );
 
     // Two identical reads back to back: the second cannot claim `live`, because
     // nothing in the runtime can prove the shadow tree did not change.

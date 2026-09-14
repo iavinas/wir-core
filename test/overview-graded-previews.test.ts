@@ -30,60 +30,74 @@ import { WirSession } from '../src/session.js';
 // Six lists of 12. Ranked labelled-first then largest, so list A is rank 0 and the
 // unlabelled ones fall to the tail.
 const list = (n: number, label: string) =>
-  `<h2>${label}</h2><ul aria-label="${label}">`
-  + Array.from({ length: n }, (_, i) => `<li>${label} item ${i + 1}</li>`).join('')
-  + '</ul>';
-const PAGE = '<!doctype html><title>graded</title><h1>Graded</h1>'
-  + ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot'].map(n => list(12, n)).join('');
+  `<h2>${label}</h2><ul aria-label="${label}">` +
+  Array.from({ length: n }, (_, i) => `<li>${label} item ${i + 1}</li>`).join('') +
+  '</ul>';
+const PAGE =
+  '<!doctype html><title>graded</title><h1>Graded</h1>' +
+  ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot'].map((n) => list(12, n)).join('');
 
-test('item previews are graded by rank, and every withheld item stays reachable',
-  async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'wir-graded-'));
-    writeFileSync(join(dir, 'a.html'), PAGE);
+test('item previews are graded by rank, and every withheld item stays reachable', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wir-graded-'));
+  writeFileSync(join(dir, 'a.html'), PAGE);
 
-    const session = await WirSession.start({
-      headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
-    try {
-      await session.goto(`file://${join(dir, 'a.html')}`);
-      const ov = await session.dispatch({ verb: 'read' }) as Record<string, any>;
-      const cols = ov['collections'] as any[];
-      assert.ok(cols.length >= 4, `precondition: several collections (${cols.length})`);
-
-      // 1. GRADED, not flat. The first collection keeps a full preview; the tail
-      //    keeps none. A flat projection would show the same count for both.
-      const shown = cols.map(c => (c.items ?? []).length);
-      assert.equal(shown[0], 10, `rank 0 keeps the full preview: ${JSON.stringify(shown)}`);
-      assert.ok(shown[shown.length - 1] === 0,
-        `the tail keeps no preview: ${JSON.stringify(shown)}`);
-      assert.ok(shown[0]! > shown[shown.length - 1]!,
-        'previews decrease with rank — otherwise nothing was graded');
-
-      // 2. THE CONTROL — no loss, checked on EVERY collection, not just the graded
-      //    ones. This is the invariant the byte saving must not buy.
-      for (const c of cols) {
-        const n = (c.items ?? []).length;
-        assert.equal(typeof c.itemCount, 'number', 'the exact size is always stated');
-        assert.ok(c.ref, 'the ref is always kept, so the collection stays addressable');
-        if (n < c.itemCount) {
-          assert.ok(c.moreItems, `withheld items must carry a continuation: ${JSON.stringify(c)}`);
-          assert.equal(c.moreItems.count, c.itemCount - n,
-            'and the count must be exact, not an estimate of what was cut');
-          assert.equal(c.moreItems.estimated, false);
-          assert.match(c.moreItems.continuation, /"verb":"read","target":/);
-        }
-      }
-
-      // 3. The continuation actually reaches the withheld items — a promise the
-      //    runtime can compute is worthless if the call it names does not work.
-      const tail = cols.find(c => (c.items ?? []).length === 0 && c.itemCount > 0);
-      assert.ok(tail, 'precondition: a collection with no preview');
-      const drilled = await session.dispatch(
-        JSON.parse(tail.moreItems.continuation)) as Record<string, any>;
-      assert.equal(drilled['rejected'], undefined,
-        `the offered call must be honourable: ${JSON.stringify(drilled['rejected'])}`);
-      assert.ok((drilled['children'] ?? []).length > 0,
-        'and it must deliver the items the overview withheld');
-    } finally {
-      await session.close();
-    }
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
+  try {
+    await session.goto(`file://${join(dir, 'a.html')}`);
+    const ov = (await session.dispatch({ verb: 'read' })) as Record<string, any>;
+    const cols = ov['collections'] as any[];
+    assert.ok(cols.length >= 4, `precondition: several collections (${cols.length})`);
+
+    // 1. GRADED, not flat. The first collection keeps a full preview; the tail
+    //    keeps none. A flat projection would show the same count for both.
+    const shown = cols.map((c) => (c.items ?? []).length);
+    assert.equal(shown[0], 10, `rank 0 keeps the full preview: ${JSON.stringify(shown)}`);
+    assert.ok(shown[shown.length - 1] === 0, `the tail keeps no preview: ${JSON.stringify(shown)}`);
+    assert.ok(
+      shown[0]! > shown[shown.length - 1]!,
+      'previews decrease with rank — otherwise nothing was graded',
+    );
+
+    // 2. THE CONTROL — no loss, checked on EVERY collection, not just the graded
+    //    ones. This is the invariant the byte saving must not buy.
+    for (const c of cols) {
+      const n = (c.items ?? []).length;
+      assert.equal(typeof c.itemCount, 'number', 'the exact size is always stated');
+      assert.ok(c.ref, 'the ref is always kept, so the collection stays addressable');
+      if (n < c.itemCount) {
+        assert.ok(c.moreItems, `withheld items must carry a continuation: ${JSON.stringify(c)}`);
+        assert.equal(
+          c.moreItems.count,
+          c.itemCount - n,
+          'and the count must be exact, not an estimate of what was cut',
+        );
+        assert.equal(c.moreItems.estimated, false);
+        assert.match(c.moreItems.continuation, /"verb":"read","target":/);
+      }
+    }
+
+    // 3. The continuation actually reaches the withheld items — a promise the
+    //    runtime can compute is worthless if the call it names does not work.
+    const tail = cols.find((c) => (c.items ?? []).length === 0 && c.itemCount > 0);
+    assert.ok(tail, 'precondition: a collection with no preview');
+    const drilled = (await session.dispatch(JSON.parse(tail.moreItems.continuation))) as Record<
+      string,
+      any
+    >;
+    assert.equal(
+      drilled['rejected'],
+      undefined,
+      `the offered call must be honourable: ${JSON.stringify(drilled['rejected'])}`,
+    );
+    assert.ok(
+      (drilled['children'] ?? []).length > 0,
+      'and it must deliver the items the overview withheld',
+    );
+  } finally {
+    await session.close();
+  }
+});

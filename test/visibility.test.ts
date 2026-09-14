@@ -21,8 +21,11 @@ async function startOn(html: string): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-visibility-'));
   writeFileSync(join(dir, 'a.html'), html);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   await session.goto(`file://${dir}/a.html`);
@@ -31,7 +34,7 @@ async function startOn(html: string): Promise<WirSession> {
 
 async function findNames(session: WirSession, name: string): Promise<string[]> {
   const found = await session.dispatch({ verb: 'find', name });
-  return (found['matches'] as { name: string }[]).map(m => m.name);
+  return (found['matches'] as { name: string }[]).map((m) => m.name);
 }
 
 test('visibility:hidden and collapse never compile; a visible descendant survives', async () => {
@@ -48,16 +51,33 @@ test('visibility:hidden and collapse never compile; a visible descendant survive
     </div>
     <table><tr style="visibility:collapse"><td><button>Collapsed Row Action</button></td></tr></table>`);
   try {
-    assert.deepEqual(await findNames(session, 'Secret Hidden Action'), [],
-      'a visibility:hidden control must not compile');
-    assert.deepEqual(await findNames(session, 'Secret Hidden Link'), [],
-      'a visibility:hidden link must not compile');
-    assert.deepEqual(await findNames(session, 'Collapsed Row Action'), [],
-      'a visibility:collapse subtree must not compile');
-    assert.deepEqual(await findNames(session, 'Plainly Visible Action'), ['Plainly Visible Action'],
-      'a visible control must be unaffected');
+    assert.deepEqual(
+      await findNames(session, 'Secret Hidden Action'),
+      [],
+      'a visibility:hidden control must not compile',
+    );
+    assert.deepEqual(
+      await findNames(session, 'Secret Hidden Link'),
+      [],
+      'a visibility:hidden link must not compile',
+    );
+    assert.deepEqual(
+      await findNames(session, 'Collapsed Row Action'),
+      [],
+      'a visibility:collapse subtree must not compile',
+    );
+    assert.deepEqual(
+      await findNames(session, 'Plainly Visible Action'),
+      ['Plainly Visible Action'],
+      'a visible control must be unaffected',
+    );
     // The per-node rule: hidden ancestor, visible child.
-    assert.deepEqual(await findNames(session, 'Re-Shown Descendant'), ['Re-Shown Descendant'],
-      'a visible descendant of a hidden ancestor must survive — exclusion is per layout node, never subtree pruning');
-  } finally { await session.close(); }
+    assert.deepEqual(
+      await findNames(session, 'Re-Shown Descendant'),
+      ['Re-Shown Descendant'],
+      'a visible descendant of a hidden ancestor must survive — exclusion is per layout node, never subtree pruning',
+    );
+  } finally {
+    await session.close();
+  }
 });

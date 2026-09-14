@@ -32,30 +32,36 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
-const PAGE = '<!doctype html><title>range</title><h1>Range</h1>'
-  + '<input id="r" type="range" min="1" max="100" value="1" aria-label="Level">'
-  + '<input id="t" type="text" aria-label="Words">'
-  + '<pre id="log"></pre>'
-  + '<script>'
-  + 'window.fired = [];'
-  + 'const r = document.getElementById("r");'
-  + 'r.addEventListener("input", () => window.fired.push("input:" + r.value));'
-  + 'r.addEventListener("change", () => window.fired.push("change:" + r.value));'
-  + '</script>';
+const PAGE =
+  '<!doctype html><title>range</title><h1>Range</h1>' +
+  '<input id="r" type="range" min="1" max="100" value="1" aria-label="Level">' +
+  '<input id="t" type="text" aria-label="Words">' +
+  '<pre id="log"></pre>' +
+  '<script>' +
+  'window.fired = [];' +
+  'const r = document.getElementById("r");' +
+  'r.addEventListener("input", () => window.fired.push("input:" + r.value));' +
+  'r.addEventListener("change", () => window.fired.push("change:" + r.value));' +
+  '</script>';
 
 async function withPage(fn: (s: WirSession) => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-range-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+  });
   try {
     await session.goto(`file://${join(dir, 'a.html')}`);
     await fn(session);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 }
 
 const control = async (s: WirSession, role: string): Promise<any> => {
-  const ov = await s.dispatch({ verb: 'read' }) as Record<string, any>;
+  const ov = (await s.dispatch({ verb: 'read' })) as Record<string, any>;
   return (ov['controls'] ?? []).find((c: any) => String(c.role) === role);
 };
 
@@ -63,21 +69,31 @@ test('fill moves a range, and fires the input+change a drag would', async () => 
   await withPage(async (s) => {
     const sl = await control(s, 'slider');
     assert.ok(sl, 'precondition: the range compiled as a slider');
-    const r = await s.dispatch(
-      { verb: 'act', ref: sl.ref, action: 'fill', value: '100' }) as Record<string, any>;
+    const r = (await s.dispatch({
+      verb: 'act',
+      ref: sl.ref,
+      action: 'fill',
+      value: '100',
+    })) as Record<string, any>;
     assert.equal(r['rejected'], undefined, `not rejected: ${JSON.stringify(r['rejected'])}`);
-    assert.equal(r['effect']?.verdict, 'verified',
-      `the write is verified, not contradicted: ${JSON.stringify(r['effect'])}`);
+    assert.equal(
+      r['effect']?.verdict,
+      'verified',
+      `the write is verified, not contradicted: ${JSON.stringify(r['effect'])}`,
+    );
 
     // The ORACLE, independent of WIR: did the value actually move?
-    const value = await s.host.page.evaluate(() =>
-      (document.getElementById('r') as HTMLInputElement).value);
+    const value = await s.host.page.evaluate(
+      () => (document.getElementById('r') as HTMLInputElement).value,
+    );
     assert.equal(value, '100', 'the DOM value actually moved');
 
     // And the page saw the events its own listener needs.
     const fired = await s.host.page.evaluate(() => (window as any).fired as string[]);
-    assert.ok(fired.includes('input:100'),
-      `the page received input — this is what a slider listens for: ${JSON.stringify(fired)}`);
+    assert.ok(
+      fired.includes('input:100'),
+      `the page received input — this is what a slider listens for: ${JSON.stringify(fired)}`,
+    );
     assert.ok(fired.includes('change:100'), `and change: ${JSON.stringify(fired)}`);
   });
 });
@@ -88,12 +104,17 @@ test('CONTROL — an ordinary text input still takes the insertText path', async
   await withPage(async (s) => {
     const t = await control(s, 'textbox');
     assert.ok(t, 'precondition: the text input compiled');
-    const r = await s.dispatch(
-      { verb: 'act', ref: t.ref, action: 'fill', value: 'hello' }) as Record<string, any>;
+    const r = (await s.dispatch({
+      verb: 'act',
+      ref: t.ref,
+      action: 'fill',
+      value: 'hello',
+    })) as Record<string, any>;
     assert.equal(r['effect']?.verdict, 'verified');
     assert.equal(r['effect']?.evidence, 'value_set');
-    const value = await s.host.page.evaluate(() =>
-      (document.getElementById('t') as HTMLInputElement).value);
+    const value = await s.host.page.evaluate(
+      () => (document.getElementById('t') as HTMLInputElement).value,
+    );
     assert.equal(value, 'hello');
   });
 });
@@ -104,12 +125,20 @@ test('CONTROL — a value the UA clamps still reports contradicted', async () =>
   // (mechanism-less) behaviour was accidentally right about.
   await withPage(async (s) => {
     const sl = await control(s, 'slider');
-    const r = await s.dispatch(
-      { verb: 'act', ref: sl.ref, action: 'fill', value: '120' }) as Record<string, any>;
-    const value = await s.host.page.evaluate(() =>
-      (document.getElementById('r') as HTMLInputElement).value);
+    const r = (await s.dispatch({
+      verb: 'act',
+      ref: sl.ref,
+      action: 'fill',
+      value: '120',
+    })) as Record<string, any>;
+    const value = await s.host.page.evaluate(
+      () => (document.getElementById('r') as HTMLInputElement).value,
+    );
     assert.equal(value, '100', 'precondition: the UA clamped it');
-    assert.equal(r['effect']?.verdict, 'contradicted',
-      `a clamped write is contradicted, never verified: ${JSON.stringify(r['effect'])}`);
+    assert.equal(
+      r['effect']?.verdict,
+      'contradicted',
+      `a clamped write is contradicted, never verified: ${JSON.stringify(r['effect'])}`,
+    );
   });
 });

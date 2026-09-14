@@ -30,7 +30,9 @@ import { compile } from '../src/compiler.js';
 import { ActExecutor } from '../src/act.js';
 import type { WirGraph } from '../src/types.js';
 
-async function stage(html: string): Promise<{ host: WirHost; graph: WirGraph; executor: ActExecutor }> {
+async function stage(
+  html: string,
+): Promise<{ host: WirHost; graph: WirGraph; executor: ActExecutor }> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-reval-'));
   writeFileSync(join(dir, 'a.html'), html);
   const host = await WirHost.launch({ headless: true });
@@ -40,7 +42,9 @@ async function stage(html: string): Promise<{ host: WirHost; graph: WirGraph; ex
 }
 
 const refOfTag = (graph: WirGraph, id: string, tag: string): string => {
-  const node = [...graph.nodes.values()].find(n => n.tag === tag && n.geometry !== null && n.name === '');
+  const node = [...graph.nodes.values()].find(
+    (n) => n.tag === tag && n.geometry !== null && n.name === '',
+  );
   assert.ok(node, `nameless ${tag} (${id}) must compile`);
   return node.ref;
 };
@@ -48,7 +52,8 @@ const refOfTag = (graph: WirGraph, id: string, tag: string): string => {
 test('a ref minted nameless is stale once the node acquires a name', async () => {
   const { host, graph, executor } = await stage(
     `<!doctype html><title>a</title><h1>Host</h1>
-     <button id="b" style="width:120px;height:28px"></button>`);
+     <button id="b" style="width:120px;height:28px"></button>`,
+  );
   try {
     const ref = refOfTag(graph, 'b', 'button');
     await host.page.evaluate(() => {
@@ -58,25 +63,32 @@ test('a ref minted nameless is stale once the node acquires a name', async () =>
     assert.ok('rejected' in result, `expected stale_ref: ${JSON.stringify(result)}`);
     assert.equal(result.rejected.kind, 'stale_ref', JSON.stringify(result));
     assert.match(result.rejected.reason, /now reads "Now Named"/, JSON.stringify(result));
-  } finally { await host.close(); }
+  } finally {
+    await host.close();
+  }
 });
 
 test('a role change on a stable name is stale', async () => {
   const { host, graph, executor } = await stage(
     `<!doctype html><title>a</title><h1>Host</h1>
-     <div id="d" role="button" aria-label="Stable Label" style="width:120px;height:28px"></div>`);
+     <div id="d" role="button" aria-label="Stable Label" style="width:120px;height:28px"></div>`,
+  );
   try {
-    const node = [...graph.nodes.values()].find(n => n.name === 'Stable Label');
+    const node = [...graph.nodes.values()].find((n) => n.name === 'Stable Label');
     assert.ok(node, 'the labelled control must compile');
     assert.equal(node.axRole, 'button', 'the raw AX role is what revalidation compares');
     await host.page.evaluate(() => {
       document.getElementById('d')!.setAttribute('role', 'link');
     });
-    const result = await executor.act(graph, { ref: node.ref, action: 'click' }, () => host.currentEpoch());
+    const result = await executor.act(graph, { ref: node.ref, action: 'click' }, () =>
+      host.currentEpoch(),
+    );
     assert.ok('rejected' in result, `expected stale_ref: ${JSON.stringify(result)}`);
     assert.equal(result.rejected.kind, 'stale_ref', JSON.stringify(result));
     assert.match(result.rejected.reason, /role/, JSON.stringify(result));
-  } finally { await host.close(); }
+  } finally {
+    await host.close();
+  }
 });
 
 // The no-new-false-stale bar, pinned: an unchanged nameless control still acts.
@@ -84,12 +96,18 @@ test('an unchanged nameless control is not falsely stale', async () => {
   const { host, graph, executor } = await stage(
     `<!doctype html><title>a</title><h1>Host</h1>
      <button id="b" style="width:120px;height:28px"
-       onclick="document.title='CLICKED'"></button>`);
+       onclick="document.title='CLICKED'"></button>`,
+  );
   try {
     const ref = refOfTag(graph, 'b', 'button');
     const result = await executor.act(graph, { ref, action: 'click' }, () => host.currentEpoch());
-    assert.ok(!('rejected' in result), `a nameless control that did not move must act: ${JSON.stringify(result)}`);
+    assert.ok(
+      !('rejected' in result),
+      `a nameless control that did not move must act: ${JSON.stringify(result)}`,
+    );
     assert.equal(result.outcome, 'delivered', JSON.stringify(result));
     assert.equal(await host.page.title(), 'CLICKED', 'the click must actually reach the page');
-  } finally { await host.close(); }
+  } finally {
+    await host.close();
+  }
 });

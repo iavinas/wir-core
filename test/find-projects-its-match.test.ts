@@ -34,45 +34,67 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
-const LONG = 'the quick brown fox jumps over the lazy dog and keeps going well past '
-  + 'any reasonable bound so the cut is forced to happen somewhere';
-const PAGE = '<!doctype html><title>match</title><h1>Match</h1>'
+const LONG =
+  'the quick brown fox jumps over the lazy dog and keeps going well past ' +
+  'any reasonable bound so the cut is forced to happen somewhere';
+const PAGE =
+  '<!doctype html><title>match</title><h1>Match</h1>' +
   // nameless, matched purely on its own text
-  + '<p>plain paragraph carrying findable words</p>'
+  '<p>plain paragraph carrying findable words</p>' +
   // spliced: a child sits between the runs, so the concatenation reads wrong
-  + '<p>invite a member to <strong>empathy-prompts</strong> or invite another group.</p>'
+  '<p>invite a member to <strong>empathy-prompts</strong> or invite another group.</p>' +
   // long own text, to force the bound
-  + `<p>${LONG}</p>`
-  + '<a href="/somewhere/deep?x=1">a link</a>'
-  + '<input type="text" aria-label="Field" value="typed value">';
+  `<p>${LONG}</p>` +
+  '<a href="/somewhere/deep?x=1">a link</a>' +
+  '<input type="text" aria-label="Field" value="typed value">';
 
 test('a match carries the text it was matched on, its href, and its value', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-match-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+  });
   try {
     await session.goto(`file://${join(dir, 'a.html')}`);
     await session.dispatch({ verb: 'read' });
 
     // 1. A nameless node matched on its own text now shows that text.
-    const plain = await session.dispatch({ verb: 'find', name: 'findable words' }) as Record<string, any>;
+    const plain = (await session.dispatch({ verb: 'find', name: 'findable words' })) as Record<
+      string,
+      any
+    >;
     const m = (plain['matches'] ?? []).find((x: any) => !x.name || !String(x.name).trim());
     assert.ok(m, `precondition: a nameless match: ${JSON.stringify(plain['matches'])}`);
-    assert.match(String(m.text), /findable words/,
-      'the string the substring rule used must be visible to the caller');
+    assert.match(
+      String(m.text),
+      /findable words/,
+      'the string the substring rule used must be visible to the caller',
+    );
 
     // 2. href travels, whole.
-    const link = await session.dispatch({ verb: 'find', role: 'link', name: 'a link' }) as Record<string, any>;
+    const link = (await session.dispatch({ verb: 'find', role: 'link', name: 'a link' })) as Record<
+      string,
+      any
+    >;
     const l = link['matches'][0];
     assert.ok(l.href, 'a link match carries its destination');
-    assert.match(String(l.href), /\/somewhere\/deep\?x=1$/,
-      'and carries it WHOLE — a cut URL is truncation presented as complete');
+    assert.match(
+      String(l.href),
+      /\/somewhere\/deep\?x=1$/,
+      'and carries it WHOLE — a cut URL is truncation presented as complete',
+    );
 
     // 3. value travels, so `find role=textbox` can say what is in the box.
-    const field = await session.dispatch({ verb: 'find', role: 'textbox' }) as Record<string, any>;
+    const field = (await session.dispatch({ verb: 'find', role: 'textbox' })) as Record<
+      string,
+      any
+    >;
     assert.equal(field['matches'][0]?.value, 'typed value');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('spliced own text is withheld, exactly as nodeDetail withholds it', async () => {
@@ -82,46 +104,77 @@ test('spliced own text is withheld, exactly as nodeDetail withholds it', async (
   const dir = mkdtempSync(join(tmpdir(), 'wir-splice-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+  });
   try {
     await session.goto(`file://${join(dir, 'a.html')}`);
     await session.dispatch({ verb: 'read' });
-    const r = await session.dispatch({ verb: 'find', name: 'invite a member' }) as Record<string, any>;
+    const r = (await session.dispatch({ verb: 'find', name: 'invite a member' })) as Record<
+      string,
+      any
+    >;
     const spliced = (r['matches'] ?? []).find((x: any) => String(x.role) === 'paragraph');
-    assert.ok(spliced, `precondition: the spliced paragraph matched: ${JSON.stringify(r['matches'])}`);
-    assert.equal(spliced.text, undefined,
-      'a concatenation that reads as fluent prose with a word missing is not shown');
-  } finally { await session.close(); }
+    assert.ok(
+      spliced,
+      `precondition: the spliced paragraph matched: ${JSON.stringify(r['matches'])}`,
+    );
+    assert.equal(
+      spliced.text,
+      undefined,
+      'a concatenation that reads as fluent prose with a word missing is not shown',
+    );
+  } finally {
+    await session.close();
+  }
 });
 
-test('a long match text is cut at the shared bound and offers the same continuation',
-  async () => {
-    // CONTROL 2. The width must equal buildItemIndex's, or one node mints two
-    // independent chains and the ledger double-counts what it withheld.
-    const dir = mkdtempSync(join(tmpdir(), 'wir-bound-'));
-    writeFileSync(join(dir, 'a.html'), PAGE);
-    const session = await WirSession.start({
-      headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
-    try {
-      await session.goto(`file://${join(dir, 'a.html')}`);
-      await session.dispatch({ verb: 'read' });
-      const r = await session.dispatch({ verb: 'find', name: 'quick brown fox' }) as Record<string, any>;
-      const long = (r['matches'] ?? []).find((x: any) => x.text);
-      assert.ok(long, 'precondition: the long paragraph matched with text');
-      // NOT a length comparison against the original: the marker adds characters,
-      // so a string cut at 80 can be LONGER than a 131-char original. The property
-      // that matters is that content was withheld and is reachable.
-      assert.ok(!String(long.text).includes('happen somewhere'),
-        `the tail is withheld: ${JSON.stringify(long.text)}`);
-      assert.match(String(long.text), /\[\+\d+ chars: /,
-        'the cut is marked with an EXACT residual, never a bare ellipsis');
-      const call = /\{"verb":"read","target":"(n_[0-9a-f]+)"\}/.exec(String(long.text));
-      assert.ok(call, `and names the literal call that reaches the rest: ${long.text}`);
-      // The promise must be honourable — a computable continuation that rejects is
-      // the C4 class this codebase has paid for before.
-      const rest = await session.dispatch(
-        { verb: 'read', target: call[1]! }) as Record<string, any>;
-      assert.equal(rest['rejected'], undefined,
-        `the offered call must work: ${JSON.stringify(rest['rejected'])}`);
-    } finally { await session.close(); }
+test('a long match text is cut at the shared bound and offers the same continuation', async () => {
+  // CONTROL 2. The width must equal buildItemIndex's, or one node mints two
+  // independent chains and the ledger double-counts what it withheld.
+  const dir = mkdtempSync(join(tmpdir(), 'wir-bound-'));
+  writeFileSync(join(dir, 'a.html'), PAGE);
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
+  try {
+    await session.goto(`file://${join(dir, 'a.html')}`);
+    await session.dispatch({ verb: 'read' });
+    const r = (await session.dispatch({ verb: 'find', name: 'quick brown fox' })) as Record<
+      string,
+      any
+    >;
+    const long = (r['matches'] ?? []).find((x: any) => x.text);
+    assert.ok(long, 'precondition: the long paragraph matched with text');
+    // NOT a length comparison against the original: the marker adds characters,
+    // so a string cut at 80 can be LONGER than a 131-char original. The property
+    // that matters is that content was withheld and is reachable.
+    assert.ok(
+      !String(long.text).includes('happen somewhere'),
+      `the tail is withheld: ${JSON.stringify(long.text)}`,
+    );
+    assert.match(
+      String(long.text),
+      /\[\+\d+ chars: /,
+      'the cut is marked with an EXACT residual, never a bare ellipsis',
+    );
+    const call = /\{"verb":"read","target":"(n_[0-9a-f]+)"\}/.exec(String(long.text));
+    assert.ok(call, `and names the literal call that reaches the rest: ${long.text}`);
+    // The promise must be honourable — a computable continuation that rejects is
+    // the C4 class this codebase has paid for before.
+    const rest = (await session.dispatch({ verb: 'read', target: call[1]! })) as Record<
+      string,
+      any
+    >;
+    assert.equal(
+      rest['rejected'],
+      undefined,
+      `the offered call must work: ${JSON.stringify(rest['rejected'])}`,
+    );
+  } finally {
+    await session.close();
+  }
+});

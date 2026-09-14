@@ -13,8 +13,18 @@ WIR Core is a TypeScript runtime for browser agents. It turns a live browser pag
 
 ## Install
 
+The package is not currently published to npm.
+
+From the parent repository, install the local workspace dependency:
+
 ```bash
-npm install @wir/core
+npm install
+```
+
+From another local project, install the package by path:
+
+```bash
+npm install /path/to/wir-public/wir-core
 ```
 
 WIR Core requires Node.js 22 or newer. Playwright is used for browser access.

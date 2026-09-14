@@ -27,11 +27,16 @@ import { WirSession } from '../src/session.js';
 
 async function withSession(fn: (s: WirSession, ref: string) => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-finishargs-'));
-  writeFileSync(join(dir, 'a.html'),
-    '<!doctype html><title>a</title><h1>Bestsellers</h1><p>Quest Lumaflex Band</p>');
+  writeFileSync(
+    join(dir, 'a.html'),
+    '<!doctype html><title>a</title><h1>Bestsellers</h1><p>Quest Lumaflex Band</p>',
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   try {
@@ -52,7 +57,8 @@ const reason = (r: Record<string, unknown>): string =>
 test('an array answer names ANSWER, and says the encoding', async () => {
   await withSession(async (session, ref) => {
     const out = await session.dispatch({
-      verb: 'finish', answer: ['Quest Lumaflex Band'] as unknown as string,
+      verb: 'finish',
+      answer: ['Quest Lumaflex Band'] as unknown as string,
       evidenceRefs: [ref],
     });
     const why = reason(out);
@@ -69,22 +75,28 @@ test('an array answer names ANSWER, and says the encoding', async () => {
 test('an upper-case status names STATUS and hands back the lower-case call', async () => {
   await withSession(async (session, ref) => {
     const out = await session.dispatch({
-      verb: 'finish', answer: '["Quest Lumaflex Band"]', evidenceRefs: [ref],
+      verb: 'finish',
+      answer: '["Quest Lumaflex Band"]',
+      evidenceRefs: [ref],
       status: 'SUCCESS' as unknown as 'success',
     });
     const why = reason(out);
     assert.match(why, /status must be/, why);
     assert.match(why, /"success"/, why);
     // The whole point: a correctly-encoded answer must NOT be blamed.
-    assert.doesNotMatch(why, /answer must be a string/,
-      `the answer was a string; blaming it is what caused three wasted retries: ${why}`);
+    assert.doesNotMatch(
+      why,
+      /answer must be a string/,
+      `the answer was a string; blaming it is what caused three wasted retries: ${why}`,
+    );
   });
 });
 
 test('a non-string ref names EVIDENCEREFS, and says it is never encoded', async () => {
   await withSession(async (session) => {
     const out = await session.dispatch({
-      verb: 'finish', answer: '["x"]',
+      verb: 'finish',
+      answer: '["x"]',
       evidenceRefs: '["n_abc"]' as unknown as string[],
     });
     const why = reason(out);
@@ -96,10 +108,15 @@ test('a non-string ref names EVIDENCEREFS, and says it is never encoded', async 
 test('the control: lower-case status and an encoded answer are accepted', async () => {
   await withSession(async (session, ref) => {
     const out = await session.dispatch({
-      verb: 'finish', answer: '["Quest Lumaflex Band"]', evidenceRefs: [ref],
+      verb: 'finish',
+      answer: '["Quest Lumaflex Band"]',
+      evidenceRefs: [ref],
       status: 'success',
     });
-    assert.equal(out['accepted'], true,
-      `a well-formed finish must still pass — a stricter message must not become a stricter gate: ${JSON.stringify(out).slice(0, 300)}`);
+    assert.equal(
+      out['accepted'],
+      true,
+      `a well-formed finish must still pass — a stricter message must not become a stricter gate: ${JSON.stringify(out).slice(0, 300)}`,
+    );
   });
 });

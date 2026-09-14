@@ -82,7 +82,9 @@ function serve(): Promise<{ server: Server; base: string; held: ServerResponse[]
     // The 671 shape: the submit is ACCEPTED at once (302, the POST-redirect-GET
     // idiom), and the resulting page is what is slow.
     if (req.method === 'POST' && req.url === '/slow-render') {
-      res.writeHead(302, { location: '/landed' }); res.end(); return;
+      res.writeHead(302, { location: '/landed' });
+      res.end();
+      return;
     }
     if (req.url === '/landed') {
       // Held open past both of the act's windows: headers never arrive, so the
@@ -99,44 +101,60 @@ function serve(): Promise<{ server: Server; base: string; held: ServerResponse[]
     if (req.method === 'POST' && req.url === '/refuse-and-hang') {
       held.push(res);
       res.writeHead(422, { 'content-type': 'text/html', 'content-length': '4096' });
-      res.write('<!doctype html><title>rejected</title><h1>The change you requested was rejected</h1>');
+      res.write(
+        '<!doctype html><title>rejected</title><h1>The change you requested was rejected</h1>',
+      );
       return;
     }
     // An accepted POST that commits at once, somewhere other than the clicked
     // link's declared href.
     if (req.method === 'POST' && req.url === '/fast-elsewhere') {
-      res.writeHead(302, { location: '/other' }); res.end(); return;
+      res.writeHead(302, { location: '/other' });
+      res.end();
+      return;
     }
     // An accepted 302 whose destination the browser FINISHES without committing
     // anything — 204 completes the navigation and leaves the page in place.
     if (req.method === 'POST' && req.url === '/dead-destination') {
-      res.writeHead(302, { location: '/nothing-to-show' }); res.end(); return;
+      res.writeHead(302, { location: '/nothing-to-show' });
+      res.end();
+      return;
     }
-    if (req.url === '/nothing-to-show') { res.writeHead(204); res.end(); return; }
+    if (req.url === '/nothing-to-show') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
     // Unanswered for longer than the act's whole settle — no status, no headers,
     // so it holds the act in the extra window with nothing to classify — then 204,
     // which completes the navigation without replacing the document.
     if (req.method === 'POST' && req.url === '/pending-then-nothing') {
       held.push(res);
-      setTimeout(() => { res.writeHead(204); res.end(); }, PENDING_POST_MS).unref();
+      setTimeout(() => {
+        res.writeHead(204);
+        res.end();
+      }, PENDING_POST_MS).unref();
       return;
     }
     if (req.method === 'POST' && req.url === '/late-xhr') {
       held.push(res);
       setTimeout(() => {
-        res.writeHead(200, { 'content-type': 'application/json' }); res.end('{}');
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end('{}');
       }, LATE_XHR_MS).unref();
       return;
     }
-    const body = req.url === '/'
-      ? PAGE
-      : `<!doctype html><title>${req.url}</title><h1>Page ${req.url}</h1>`;
-    res.writeHead(200, { 'content-type': 'text/html' }); res.end(body);
+    const body =
+      req.url === '/' ? PAGE : `<!doctype html><title>${req.url}</title><h1>Page ${req.url}</h1>`;
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end(body);
   });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => {
-    const addr = server.address() as { port: number };
-    resolve({ server, base: `http://127.0.0.1:${addr.port}`, held });
-  }));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number };
+      resolve({ server, base: `http://127.0.0.1:${addr.port}`, held });
+    }),
+  );
 }
 
 type Effect = { verdict: string; evidence: string; delta: { after: string } };
@@ -150,14 +168,18 @@ async function clickByName(session: WirSession, name: string): Promise<Record<st
 
 function startSession(): Promise<WirSession> {
   return WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
-    harPath: null, tracePath: null, debugScreenshots: false,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
   });
 }
 
 function closeServer(server: Server, held: ServerResponse[]): Promise<void> {
   for (const res of held) res.destroy();
-  return new Promise(resolve => server.close(() => resolve()));
+  return new Promise((resolve) => server.close(() => resolve()));
 }
 
 describe('an accepted submit is not vetoed by its own render', { concurrency: 6 }, () => {
@@ -168,10 +190,16 @@ describe('an accepted submit is not vetoed by its own render', { concurrency: 6 
       await session.goto(`${base}/`);
       const acted = await clickByName(session, 'Create submission');
       const effect = acted['effect'] as Effect;
-      assert.equal(effect.evidence, 'navigation_post',
-        `the server accepted this submit: ${JSON.stringify(acted)}`);
-      assert.equal(effect.verdict, 'verified',
-        `the render's clock must not decide the verdict: ${JSON.stringify(acted)}`);
+      assert.equal(
+        effect.evidence,
+        'navigation_post',
+        `the server accepted this submit: ${JSON.stringify(acted)}`,
+      );
+      assert.equal(
+        effect.verdict,
+        'verified',
+        `the render's clock must not decide the verdict: ${JSON.stringify(acted)}`,
+      );
       // The answer that made the verdict travels with the delta…
       assert.match(effect.delta.after, /answered 302/);
       // …and so does the honest half: the caller is NOT looking at the result yet.
@@ -179,10 +207,15 @@ describe('an accepted submit is not vetoed by its own render', { concurrency: 6 
       assert.doesNotMatch(effect.delta.after, /\(gone\)/);
 
       const finish = await session.dispatch({
-        verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+        verb: 'finish',
+        answer: '',
+        evidenceRefs: [acted['actRef'] as string],
       });
-      assert.equal(finish['accepted'], true,
-        `an accepted submit must be finishable: ${JSON.stringify(finish)}`);
+      assert.equal(
+        finish['accepted'],
+        true,
+        `an accepted submit must be finishable: ${JSON.stringify(finish)}`,
+      );
     } finally {
       await session.close();
       await closeServer(server, held);
@@ -200,16 +233,27 @@ describe('an accepted submit is not vetoed by its own render', { concurrency: 6 
       await session.goto(`${base}/`);
       const acted = await clickByName(session, 'Create refused submission');
       const effect = acted['effect'] as Effect;
-      assert.notEqual(effect.verdict, 'verified',
-        `a refused submit must never read verified: ${JSON.stringify(acted)}`);
-      assert.match(effect.delta.after, /422/,
-        `the status that withheld the verdict must be reported: ${JSON.stringify(acted)}`);
+      assert.notEqual(
+        effect.verdict,
+        'verified',
+        `a refused submit must never read verified: ${JSON.stringify(acted)}`,
+      );
+      assert.match(
+        effect.delta.after,
+        /422/,
+        `the status that withheld the verdict must be reported: ${JSON.stringify(acted)}`,
+      );
 
       const finish = await session.dispatch({
-        verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+        verb: 'finish',
+        answer: '',
+        evidenceRefs: [acted['actRef'] as string],
       });
-      assert.equal((finish['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-        `the gate must not spend a refused submit: ${JSON.stringify(finish)}`);
+      assert.equal(
+        (finish['rejected'] as { kind: string } | undefined)?.kind,
+        'finish_rejected',
+        `the gate must not spend a refused submit: ${JSON.stringify(finish)}`,
+      );
     } finally {
       await session.close();
       await closeServer(server, held);
@@ -236,17 +280,28 @@ describe('an accepted submit is not vetoed by its own render', { concurrency: 6 
       await session.goto(`${base}/`);
       const acted = await clickByName(session, 'Create doomed submission');
       const effect = acted['effect'] as Effect;
-      assert.notEqual(effect.verdict, 'verified',
-        `a finished request that committed nothing proves nothing: ${JSON.stringify(acted)}`);
-      assert.match(effect.delta.after, /answered 302; no new document committed/,
-        `an ACCEPTED answer reaches the residual too — the note must not call it a `
-        + `refusal: ${JSON.stringify(acted)}`);
+      assert.notEqual(
+        effect.verdict,
+        'verified',
+        `a finished request that committed nothing proves nothing: ${JSON.stringify(acted)}`,
+      );
+      assert.match(
+        effect.delta.after,
+        /answered 302; no new document committed/,
+        `an ACCEPTED answer reaches the residual too — the note must not call it a ` +
+          `refusal: ${JSON.stringify(acted)}`,
+      );
 
       const finish = await session.dispatch({
-        verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+        verb: 'finish',
+        answer: '',
+        evidenceRefs: [acted['actRef'] as string],
       });
-      assert.equal((finish['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-        `the gate must not spend it either: ${JSON.stringify(finish)}`);
+      assert.equal(
+        (finish['rejected'] as { kind: string } | undefined)?.kind,
+        'finish_rejected',
+        `the gate must not spend it either: ${JSON.stringify(finish)}`,
+      );
     } finally {
       await session.close();
       await closeServer(server, held);
@@ -268,8 +323,11 @@ describe('an accepted submit is not vetoed by its own render', { concurrency: 6 
       await session.goto(`${base}/`);
       const acted = await clickByName(session, 'Open expected page');
       const effect = acted['effect'] as Effect;
-      assert.equal(effect.verdict, 'contradicted',
-        `a link that went elsewhere must stay contradicted: ${JSON.stringify(acted)}`);
+      assert.equal(
+        effect.verdict,
+        'contradicted',
+        `a link that went elsewhere must stay contradicted: ${JSON.stringify(acted)}`,
+      );
       assert.equal(effect.evidence, 'navigated_elsewhere', JSON.stringify(acted));
     } finally {
       await session.close();
@@ -302,8 +360,11 @@ describe('an accepted submit is not vetoed by its own render', { concurrency: 6 
       await session.goto(`${base}/`);
       const acted = await clickByName(session, 'Follow slow link');
       const effect = acted['effect'] as Effect;
-      assert.notEqual(effect.evidence, 'navigated_elsewhere',
-        `the href branch must not own an act whose URL never moved: ${JSON.stringify(acted)}`);
+      assert.notEqual(
+        effect.evidence,
+        'navigated_elsewhere',
+        `the href branch must not own an act whose URL never moved: ${JSON.stringify(acted)}`,
+      );
       assert.equal(effect.evidence, 'navigation_post', JSON.stringify(acted));
       assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     } finally {
@@ -338,15 +399,23 @@ describe('an accepted submit is not vetoed by its own render', { concurrency: 6 
       await session.goto(`${base}/`);
       const acted = await clickByName(session, 'Save and keep waiting');
       const effect = acted['effect'] as Effect;
-      assert.notEqual(effect.evidence, 'request_committed',
-        `the extra window must not widen the correlated population: ${JSON.stringify(acted)}`);
+      assert.notEqual(
+        effect.evidence,
+        'request_committed',
+        `the extra window must not widen the correlated population: ${JSON.stringify(acted)}`,
+      );
       assert.equal(effect.evidence, 'dom_mutated', JSON.stringify(acted));
 
       const finish = await session.dispatch({
-        verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+        verb: 'finish',
+        answer: '',
+        evidenceRefs: [acted['actRef'] as string],
       });
-      assert.equal((finish['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-        `local-only evidence must stay unspendable: ${JSON.stringify(finish)}`);
+      assert.equal(
+        (finish['rejected'] as { kind: string } | undefined)?.kind,
+        'finish_rejected',
+        `local-only evidence must stay unspendable: ${JSON.stringify(finish)}`,
+      );
     } finally {
       await session.close();
       await closeServer(server, held);

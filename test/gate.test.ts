@@ -13,8 +13,10 @@ import { WirSession } from '../src/session.js';
 test('MUTATE finish citing only a link-follow act is rejected', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-gate-'));
   writeFileSync(join(dir, 'b.html'), '<!doctype html><title>b</title><h1>Page B</h1>');
-  writeFileSync(join(dir, 'a.html'),
-    `<!doctype html><title>a</title><h1>Page A</h1><a href="file://${dir}/b.html">to page b</a>`);
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>a</title><h1>Page A</h1><a href="file://${dir}/b.html">to page b</a>`,
+  );
 
   const session = await WirSession.start({
     headless: true,
@@ -39,11 +41,16 @@ test('MUTATE finish citing only a link-follow act is rejected', async () => {
     assert.equal(effect.evidence, 'navigated_to_destination');
 
     const finish = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [acted['actRef'] as string],
     });
     const rejected = finish['rejected'] as { kind: string } | undefined;
-    assert.equal(rejected?.kind, 'finish_rejected',
-      `a GET the markup declared must not prove a mutation: ${JSON.stringify(finish)}`);
+    assert.equal(
+      rejected?.kind,
+      'finish_rejected',
+      `a GET the markup declared must not prove a mutation: ${JSON.stringify(finish)}`,
+    );
   } finally {
     await session.close();
   }

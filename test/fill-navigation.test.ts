@@ -42,39 +42,60 @@ function serve(): Promise<{ server: Server; base: string }> {
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end(PAGE);
   });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => {
-    const addr = server.address() as { port: number };
-    resolve({ server, base: `http://127.0.0.1:${addr.port}` });
-  }));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number };
+      resolve({ server, base: `http://127.0.0.1:${addr.port}` });
+    }),
+  );
 }
 
-async function fillByName(session: WirSession, name: string, value: string):
-    Promise<{ verdict: string; evidence: string; delta: { before: string; after: string } }> {
-  const found = await session.dispatch({ verb: 'find', name }) as
-    { matches?: { ref: string }[] };
+async function fillByName(
+  session: WirSession,
+  name: string,
+  value: string,
+): Promise<{ verdict: string; evidence: string; delta: { before: string; after: string } }> {
+  const found = (await session.dispatch({ verb: 'find', name })) as { matches?: { ref: string }[] };
   const ref = found.matches?.[0]?.ref;
   assert.ok(ref, `find ${JSON.stringify(name)} returned a match`);
-  const acted = await session.dispatch({ verb: 'act', ref, action: 'fill', value }) as
-    { effect?: { verdict: string; evidence: string; delta: { before: string; after: string } };
-      rejected?: unknown };
-  assert.equal(acted.rejected, undefined, `fill was not rejected: ${JSON.stringify(acted.rejected)}`);
+  const acted = (await session.dispatch({ verb: 'act', ref, action: 'fill', value })) as {
+    effect?: { verdict: string; evidence: string; delta: { before: string; after: string } };
+    rejected?: unknown;
+  };
+  assert.equal(
+    acted.rejected,
+    undefined,
+    `fill was not rejected: ${JSON.stringify(acted.rejected)}`,
+  );
   assert.ok(acted.effect, 'fill returned an effect');
-  return acted.effect as { verdict: string; evidence: string; delta: { before: string; after: string } };
+  return acted.effect as {
+    verdict: string;
+    evidence: string;
+    delta: { before: string; after: string };
+  };
 }
 
 test('a fill whose input handler navigates mints navigation, never contradicted', async () => {
   const { server, base } = await serve();
-  const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-    storageStatePath: null, harPath: null, tracePath: null, debugScreenshots: false });
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
+  });
   try {
     await session.goto(`${base}/`);
     const effect = await fillByName(session, 'Search products', 'squash rackets');
-    assert.notEqual(effect.verdict, 'contradicted',
-      `a navigating fill must never read contradicted (got ${effect.verdict}/${effect.evidence})`);
+    assert.notEqual(
+      effect.verdict,
+      'contradicted',
+      `a navigating fill must never read contradicted (got ${effect.verdict}/${effect.evidence})`,
+    );
     assert.equal(effect.verdict, 'verified');
     assert.equal(effect.evidence, 'navigation_get');
-    assert.match(effect.delta.after, /\/results\?q=/,
-      'the delta names where the document landed');
+    assert.match(effect.delta.after, /\/results\?q=/, 'the delta names where the document landed');
   } finally {
     await session.close().catch(() => undefined);
     server.close();
@@ -83,8 +104,14 @@ test('a fill whose input handler navigates mints navigation, never contradicted'
 
 test('a plain fill on the same page keeps its value verdict (control)', async () => {
   const { server, base } = await serve();
-  const session = await WirSession.start({ headless: true, expectedAction: 'RETRIEVE',
-    storageStatePath: null, harPath: null, tracePath: null, debugScreenshots: false });
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
+  });
   try {
     await session.goto(`${base}/`);
     const effect = await fillByName(session, 'Notes', 'plain text');

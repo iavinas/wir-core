@@ -29,32 +29,45 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
-const PAGE = '<!doctype html><title>upload</title><h1>Upload</h1>'
-  + '<input id="f" type="file" aria-label="Document">';
+const PAGE =
+  '<!doctype html><title>upload</title><h1>Upload</h1>' +
+  '<input id="f" type="file" aria-label="Document">';
 
 async function withUploadDir(
-  files: string[], fn: (s: WirSession, ref: string) => Promise<void>,
+  files: string[],
+  fn: (s: WirSession, ref: string) => Promise<void>,
 ): Promise<void> {
   const pageDir = mkdtempSync(join(tmpdir(), 'wir-up-page-'));
   const upDir = mkdtempSync(join(tmpdir(), 'wir-up-files-'));
   writeFileSync(join(pageDir, 'a.html'), PAGE);
   for (const f of files) writeFileSync(join(upDir, f), 'x');
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null, uploadDir: upDir });
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    uploadDir: upDir,
+  });
   try {
     await session.goto(`file://${join(pageDir, 'a.html')}`);
-    const ov = await session.dispatch({ verb: 'read' }) as Record<string, any>;
-    const input = (ov['controls'] ?? []).find((c: any) => /file|Document|Choose/i.test(String(c.name ?? '')))
-      ?? (ov['controls'] ?? [])[0];
+    const ov = (await session.dispatch({ verb: 'read' })) as Record<string, any>;
+    const input =
+      (ov['controls'] ?? []).find((c: any) => /file|Document|Choose/i.test(String(c.name ?? ''))) ??
+      (ov['controls'] ?? [])[0];
     assert.ok(input, `precondition: the file input compiled: ${JSON.stringify(ov['controls'])}`);
     await fn(session, input.ref);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 }
 
 test('a wrong filename is told what is there, with a call that works', async () => {
   await withUploadDir(['doc.txt', 'report.pdf'], async (s, ref) => {
-    const r = await s.dispatch(
-      { verb: 'act', ref, action: 'upload', value: 'guess.txt' }) as Record<string, any>;
+    const r = (await s.dispatch({
+      verb: 'act',
+      ref,
+      action: 'upload',
+      value: 'guess.txt',
+    })) as Record<string, any>;
     assert.equal(r['rejected']?.kind, 'invalid_args');
     const reason = String(r['rejected']?.reason);
     assert.match(reason, /doc\.txt/, `it names what IS available: ${reason}`);
@@ -64,9 +77,12 @@ test('a wrong filename is told what is there, with a call that works', async () 
     // the C4 class this repo has paid for before.
     const call = JSON.parse(String(r['rejected']?.repair)) as Record<string, unknown>;
     assert.equal(call['action'], 'upload');
-    const second = await s.dispatch(call as never) as Record<string, any>;
-    assert.equal(second['rejected'], undefined,
-      `the offered call must work: ${JSON.stringify(second['rejected'])}`);
+    const second = (await s.dispatch(call as never)) as Record<string, any>;
+    assert.equal(
+      second['rejected'],
+      undefined,
+      `the offered call must work: ${JSON.stringify(second['rejected'])}`,
+    );
     assert.equal(second['effect']?.evidence, 'file_attached');
   });
 });
@@ -75,8 +91,12 @@ test('the listing is bounded and says how many it withheld', async () => {
   // Never a silent truncation, the same rule every other list here follows.
   const many = Array.from({ length: 14 }, (_, i) => `f${String(i).padStart(2, '0')}.txt`);
   await withUploadDir(many, async (s, ref) => {
-    const r = await s.dispatch(
-      { verb: 'act', ref, action: 'upload', value: 'nope.txt' }) as Record<string, any>;
+    const r = (await s.dispatch({
+      verb: 'act',
+      ref,
+      action: 'upload',
+      value: 'nope.txt',
+    })) as Record<string, any>;
     const reason = String(r['rejected']?.reason);
     assert.match(reason, /\(\+\d+ more\)/, `the residual is exact: ${reason}`);
   });
@@ -87,11 +107,16 @@ test('CONTROL — a path is still refused, and never listed around', async () =>
   // directory, it would be an exfiltration primitive driven by page text.
   await withUploadDir(['doc.txt'], async (s, ref) => {
     for (const bad of ['../secret.txt', '/etc/passwd', 'sub/doc.txt']) {
-      const r = await s.dispatch(
-        { verb: 'act', ref, action: 'upload', value: bad }) as Record<string, any>;
+      const r = (await s.dispatch({ verb: 'act', ref, action: 'upload', value: bad })) as Record<
+        string,
+        any
+      >;
       assert.equal(r['rejected']?.kind, 'invalid_args', `${bad} is refused`);
-      assert.match(String(r['rejected']?.reason), /bare filename|escapes/,
-        `${bad} is refused for its SHAPE, before any lookup: ${r['rejected']?.reason}`);
+      assert.match(
+        String(r['rejected']?.reason),
+        /bare filename|escapes/,
+        `${bad} is refused for its SHAPE, before any lookup: ${r['rejected']?.reason}`,
+      );
     }
   });
 });
@@ -99,11 +124,21 @@ test('CONTROL — a path is still refused, and never listed around', async () =>
 test('CONTROL — an empty directory promises nothing', async () => {
   // No files means no repair. Offering one would be a call that cannot be honoured.
   await withUploadDir([], async (s, ref) => {
-    const r = await s.dispatch(
-      { verb: 'act', ref, action: 'upload', value: 'anything.txt' }) as Record<string, any>;
-    assert.match(String(r['rejected']?.reason), /empty/,
-      `it says so plainly: ${r['rejected']?.reason}`);
-    assert.doesNotMatch(String(r['rejected']?.repair), /"verb":"act"/,
-      'and offers no act call it cannot honour');
+    const r = (await s.dispatch({
+      verb: 'act',
+      ref,
+      action: 'upload',
+      value: 'anything.txt',
+    })) as Record<string, any>;
+    assert.match(
+      String(r['rejected']?.reason),
+      /empty/,
+      `it says so plainly: ${r['rejected']?.reason}`,
+    );
+    assert.doesNotMatch(
+      String(r['rejected']?.repair),
+      /"verb":"act"/,
+      'and offers no act call it cannot honour',
+    );
   });
 });

@@ -30,42 +30,60 @@ import { WirSession } from '../src/session.js';
 
 test('a failed navigate rejects and the episode survives it', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-navfail-'));
-  writeFileSync(join(dir, 'a.html'),
-    '<!doctype html><title>start</title><h1>Start</h1><p>still reachable</p>');
+  writeFileSync(
+    join(dir, 'a.html'),
+    '<!doctype html><title>start</title><h1>Start</h1><p>still reachable</p>',
+  );
   const start = `file://${join(dir, 'a.html')}`;
   // Port 1 is on Chromium's unsafe-port list, so this fails deterministically and
   // offline — the same class as ERR_BLOCKED_BY_CLIENT without needing a blocker.
   const dead = 'http://127.0.0.1:1/blocked';
 
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    knownUrls: [dead, start],   // runner-declared, so the closure admits both
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    knownUrls: [dead, start], // runner-declared, so the closure admits both
   });
   try {
     await session.goto(start);
     await session.dispatch({ verb: 'read' });
 
     // The call that used to end the episode.
-    const rejected = await session.dispatch(
-      { verb: 'navigate', url: dead }) as Record<string, any>;
+    const rejected = (await session.dispatch({ verb: 'navigate', url: dead })) as Record<
+      string,
+      any
+    >;
 
     const r = rejected['rejected'];
     assert.ok(r, `a failed navigation must reject, not throw: ${JSON.stringify(rejected)}`);
     assert.equal(r.kind, 'navigation_failed');
     assert.match(r.reason, /did not complete/);
-    assert.match(r.reason, /net::ERR_/,
-      'the Chromium error code travels, so the model can tell a refusal from a bad name');
+    assert.match(
+      r.reason,
+      /net::ERR_/,
+      'the Chromium error code travels, so the model can tell a refusal from a bad name',
+    );
     assert.match(r.repair, /"verb":"read"/, 'and the repair is a literal next call');
 
     // The repair must NOT assert a position the runtime cannot vouch for.
-    assert.doesNotMatch(r.repair, /has not moved/,
-      'draft one claimed the page stayed put; the probe showed chrome-error://');
-    assert.doesNotMatch(r.repair, /file:\/\//,
-      'draft two named page.url(), which still reports the OLD document here');
+    assert.doesNotMatch(
+      r.repair,
+      /has not moved/,
+      'draft one claimed the page stayed put; the probe showed chrome-error://',
+    );
+    assert.doesNotMatch(
+      r.repair,
+      /file:\/\//,
+      'draft two named page.url(), which still reports the OLD document here',
+    );
 
     // THE EPISODE IS ALIVE. This is the whole point.
-    const after = await session.dispatch({ verb: 'read' }) as Record<string, any>;
-    assert.ok(after['url'] !== undefined, `the session must still answer: ${JSON.stringify(after)}`);
+    const after = (await session.dispatch({ verb: 'read' })) as Record<string, any>;
+    assert.ok(
+      after['url'] !== undefined,
+      `the session must still answer: ${JSON.stringify(after)}`,
+    );
     assert.equal(after['rejected'], undefined, 'and it is not stuck in a rejecting state');
   } finally {
     await session.close();

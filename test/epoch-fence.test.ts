@@ -21,13 +21,16 @@ import { ActExecutor } from '../src/act.js';
 
 test('a document replaced mid-act is a typed stale_ref, never a wrong-target click', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-epoch-'));
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>a</title><h1>Host</h1>
-    <button id="b" onclick="document.title = 'CLICKED'">Danger Button</button>`);
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>a</title><h1>Host</h1>
+    <button id="b" onclick="document.title = 'CLICKED'">Danger Button</button>`,
+  );
   const host = await WirHost.launch({ headless: true });
   try {
     await host.goto(`file://${dir}/a.html`);
     const graph = compile(await host.captureFacts());
-    const target = [...graph.nodes.values()].find(n => n.name === 'Danger Button');
+    const target = [...graph.nodes.values()].find((n) => n.name === 'Danger Button');
     assert.ok(target, 'fixture button must compile');
 
     const executor = new ActExecutor(host, () => host.drainBrowserEvents());
@@ -40,11 +43,19 @@ test('a document replaced mid-act is a typed stale_ref, never a wrong-target cli
 
     assert.ok('rejected' in result, `expected a typed rejection: ${JSON.stringify(result)}`);
     assert.equal(result.rejected.kind, 'stale_ref', JSON.stringify(result));
-    assert.match(result.rejected.repair ?? '', /"verb":"find"/,
-      'the rejection must carry the re-find repair');
+    assert.match(
+      result.rejected.repair ?? '',
+      /"verb":"find"/,
+      'the rejection must carry the re-find repair',
+    );
 
     // The proof that nothing was dispatched: the button's own handler never ran.
-    assert.equal(await host.page.title(), 'a',
-      'no click may reach the page once the fence has fired');
-  } finally { await host.close(); }
+    assert.equal(
+      await host.page.title(),
+      'a',
+      'no click may reach the page once the fence has fired',
+    );
+  } finally {
+    await host.close();
+  }
 });

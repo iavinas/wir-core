@@ -34,57 +34,83 @@ async function hrefOf(session: WirSession, name: string): Promise<string> {
   const found = await session.dispatch({ verb: 'find', name });
   const ref = ((found['matches'] ?? []) as { ref: string }[])[0]?.ref;
   assert.ok(ref, `link ${JSON.stringify(name)} not found: ${JSON.stringify(found)}`);
-  const g = await (session as unknown as
-    { ensureGraph(): Promise<{ nodes: Map<string, { href: string | null }> }> }).ensureGraph();
+  const g = await (
+    session as unknown as {
+      ensureGraph(): Promise<{ nodes: Map<string, { href: string | null }> }>;
+    }
+  ).ensureGraph();
   return g.nodes.get(ref)?.href ?? '';
 }
 
 test('<base href> is the resolution base, not the page URL', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-base-'));
   mkdirSync(join(dir, 'deep'));
-  writeFileSync(join(dir, 'deep', 'a.html'),
+  writeFileSync(
+    join(dir, 'deep', 'a.html'),
     `<!doctype html><title>based</title><base href="/elsewhere/">
-     <a href="target.html">go there</a>`);
+     <a href="target.html">go there</a>`,
+  );
 
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/deep/a.html`);
     const href = await hrefOf(session, 'go there');
     // The browser would fetch /elsewhere/target.html. Resolving against the page
     // URL gives .../deep/target.html — a path the page never points at.
-    assert.match(href, /\/elsewhere\/target\.html$/,
-      `href must resolve against <base href>: ${href}`);
-    assert.ok(!/\/deep\/target\.html$/.test(href),
-      `href resolved against the page URL instead of its base: ${href}`);
-  } finally { await session.close(); }
+    assert.match(
+      href,
+      /\/elsewhere\/target\.html$/,
+      `href must resolve against <base href>: ${href}`,
+    );
+    assert.ok(
+      !/\/deep\/target\.html$/.test(href),
+      `href resolved against the page URL instead of its base: ${href}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test("a frame's relative href resolves against the frame, not the parent", async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-base-frame-'));
   mkdirSync(join(dir, 'sub'));
-  writeFileSync(join(dir, 'sub', 'child.html'),
-    '<!doctype html><title>child</title><a href="inner.html">frame link</a>');
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>host</title><h1>Host</h1>
+  writeFileSync(
+    join(dir, 'sub', 'child.html'),
+    '<!doctype html><title>child</title><a href="inner.html">frame link</a>',
+  );
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>host</title><h1>Host</h1>
     <a href="outer.html">host link</a>
-    <iframe src="sub/child.html" width="400" height="200"></iframe>`);
+    <iframe src="sub/child.html" width="400" height="200"></iframe>`,
+  );
 
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
 
     // The frame's link resolves inside sub/ ...
     const inner = await hrefOf(session, 'frame link');
-    assert.match(inner, /\/sub\/inner\.html$/,
-      `a frame's href must resolve against the frame's document: ${inner}`);
+    assert.match(
+      inner,
+      /\/sub\/inner\.html$/,
+      `a frame's href must resolve against the frame's document: ${inner}`,
+    );
 
     // ... and the host's link is unchanged, so the fix is per-document rather
     // than a blanket re-base.
     const outer = await hrefOf(session, 'host link');
     assert.match(outer, /\/outer\.html$/, outer);
     assert.ok(!/\/sub\//.test(outer), `the host's href was re-based into the frame: ${outer}`);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });

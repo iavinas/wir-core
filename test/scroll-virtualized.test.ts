@@ -51,14 +51,17 @@ async function start(html: string): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-vscroll-'));
   writeFileSync(join(dir, 'a.html'), html);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   await session.goto(`file://${dir}/a.html`);
   return session;
 }
 
-const effectOf = (r: Record<string, unknown>): { verdict: string; evidence: string;
-  delta: { before: string; after: string } } =>
+const effectOf = (
+  r: Record<string, unknown>,
+): { verdict: string; evidence: string; delta: { before: string; after: string } } =>
   r['effect'] as { verdict: string; evidence: string; delta: { before: string; after: string } };
 
 test('a virtualized list that recycles its nodes still reports new content', async () => {
@@ -69,18 +72,22 @@ test('a virtualized list that recycles its nodes still reports new content', asy
     assert.ok(ref, `needed a ref inside the list: ${JSON.stringify(found)}`);
 
     const page = session.host.page;
-    const before = await page.evaluate(() =>
-      (document.getElementById('rows') as HTMLElement).innerText);
-    const countBefore = await page.evaluate(() =>
-      (document.getElementById('list') as HTMLElement).querySelectorAll('*').length);
+    const before = await page.evaluate(
+      () => (document.getElementById('rows') as HTMLElement).innerText,
+    );
+    const countBefore = await page.evaluate(
+      () => (document.getElementById('list') as HTMLElement).querySelectorAll('*').length,
+    );
 
     const acted = await session.dispatch({ verb: 'act', ref, action: 'scroll' });
     const effect = effectOf(acted);
 
-    const after = await page.evaluate(() =>
-      (document.getElementById('rows') as HTMLElement).innerText);
-    const countAfter = await page.evaluate(() =>
-      (document.getElementById('list') as HTMLElement).querySelectorAll('*').length);
+    const after = await page.evaluate(
+      () => (document.getElementById('rows') as HTMLElement).innerText,
+    );
+    const countAfter = await page.evaluate(
+      () => (document.getElementById('list') as HTMLElement).querySelectorAll('*').length,
+    );
 
     // The fixture must actually be virtualized, or this pins nothing: the rows
     // changed and the node count did not.
@@ -88,9 +95,14 @@ test('a virtualized list that recycles its nodes still reports new content', asy
     assert.equal(countAfter, countBefore, 'the fixture must hold its node count fixed');
 
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
-    assert.equal(effect.evidence, 'scrolled',
-      `a screen of never-seen rows must not read as "no new content": ${JSON.stringify(effect)}`);
-  } finally { await session.close(); }
+    assert.equal(
+      effect.evidence,
+      'scrolled',
+      `a screen of never-seen rows must not read as "no new content": ${JSON.stringify(effect)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('a scroller reports when it has reached its end, not only "nothing new"', async () => {
@@ -113,7 +125,9 @@ test('a scroller reports when it has reached its end, not only "nothing new"', a
       sawEnd = /at the end of this container/.test(last);
     }
     assert.ok(sawEnd, `scrolling to the bottom must say so; last delta was ${last}`);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 // The other virtualization style, and the one that broke the measurement.
@@ -166,16 +180,25 @@ test('a list that recreates its rows still measures its own scroller', async () 
     // The delta must describe the LIST on both sides. The page is 900px wide in
     // this fixture and the list's extent is 20000 — so the extent is the tell.
     assert.match(effect.delta.before, /extent=20000/, effect.delta.before);
-    assert.match(effect.delta.after, /extent=20000/,
-      `after must measure the same scroller, not the page: ${effect.delta.after}`);
-    assert.ok(!/at the end of this container/.test(effect.delta.after),
-      `the list has 20,000px below; claiming exhaustion stops the model: ${effect.delta.after}`);
+    assert.match(
+      effect.delta.after,
+      /extent=20000/,
+      `after must measure the same scroller, not the page: ${effect.delta.after}`,
+    );
+    assert.ok(
+      !/at the end of this container/.test(effect.delta.after),
+      `the list has 20,000px below; claiming exhaustion stops the model: ${effect.delta.after}`,
+    );
 
     // And the scroll must have actually moved the list, with new rows reachable.
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     assert.equal(effect.evidence, 'scrolled', JSON.stringify(effect));
     const later = await session.dispatch({ verb: 'find', name: 'row 12' });
-    assert.ok(((later['matches'] as unknown[]) ?? []).length > 0,
-      'rows past the first screen must be reachable after the scroll');
-  } finally { await session.close(); }
+    assert.ok(
+      ((later['matches'] as unknown[]) ?? []).length > 0,
+      'rows past the first screen must be reachable after the scroll',
+    );
+  } finally {
+    await session.close();
+  }
 });

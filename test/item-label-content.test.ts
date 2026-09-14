@@ -18,15 +18,16 @@ import { WirSession } from '../src/session.js';
 
 // list-style:none, as the proving page had: no ::marker pseudo-node, so the
 // leaf items really do compile with nothing for the label fallback to find.
-const PAGE = '<!doctype html><title>t</title><h1>Site</h1>'
-  + '<ul style="list-style:none">'
-  + '<li>Currently v9.9.9.</li>'
-  + '<li>Entirely plain second line with no markup at all</li>'
-  + '<li><a href="/x">Named thing</a> plus trailing words the name does not carry</li>'
-  + '</ul>';
+const PAGE =
+  '<!doctype html><title>t</title><h1>Site</h1>' +
+  '<ul style="list-style:none">' +
+  '<li>Currently v9.9.9.</li>' +
+  '<li>Entirely plain second line with no markup at all</li>' +
+  '<li><a href="/x">Named thing</a> plus trailing words the name does not carry</li>' +
+  '</ul>';
 
 function serve(): Promise<{ url: string; close: () => void }> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const s: Server = createServer((_q, r) => {
       r.writeHead(200, { 'content-type': 'text/html' });
       r.end(PAGE);
@@ -41,17 +42,26 @@ function serve(): Promise<{ url: string; close: () => void }> {
 test('an unnamed item never ships content byte-identical to its label', async () => {
   const srv = await serve();
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+  });
   try {
     await session.goto(srv.url);
-    const ov = await session.dispatch({ verb: 'read' }) as Record<string, any>;
+    const ov = (await session.dispatch({ verb: 'read' })) as Record<string, any>;
     const items = (ov['collections'] ?? []).flatMap((c: any) => c.items ?? []);
-    assert.ok(items.length >= 3, `precondition: the list previews: ${JSON.stringify(ov['collections'])}`);
+    assert.ok(
+      items.length >= 3,
+      `precondition: the list previews: ${JSON.stringify(ov['collections'])}`,
+    );
 
     for (const it of items) {
       if (it.content !== undefined) {
-        assert.notEqual(it.content, it.label,
-          `content must differ from the label actually chosen: ${JSON.stringify(it)}`);
+        assert.notEqual(
+          it.content,
+          it.label,
+          `content must differ from the label actually chosen: ${JSON.stringify(it)}`,
+        );
       }
     }
 
@@ -64,8 +74,10 @@ test('an unnamed item never ships content byte-identical to its label', async ()
     // its content. This is the delivery the guard must not overshoot into.
     const named = items.find((it: any) => it.label === 'Named thing');
     assert.ok(named, `precondition: the named item previews: ${JSON.stringify(items)}`);
-    assert.ok(String(named.content ?? '').includes('trailing words'),
-      `a named item's extra words still travel as content: ${JSON.stringify(named)}`);
+    assert.ok(
+      String(named.content ?? '').includes('trailing words'),
+      `a named item's extra words still travel as content: ${JSON.stringify(named)}`,
+    );
   } finally {
     await session.close();
     srv.close();

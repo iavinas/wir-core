@@ -29,31 +29,37 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
-const PAGE = '<!doctype html><title>ce</title><h1>CE</h1>'
-  + '<div id="ed" contenteditable="true" role="textbox" aria-label="Notes">type here</div>'
-  + '<input id="plain" type="text" aria-label="Plain">'
-  + '<div id="hot" role="group">Hover me</div>'
-  + '<div id="cold" role="group">Inert</div>'
-  + '<script>'
-  + 'document.getElementById("hot").addEventListener("mouseenter", function() {'
-  + '  this.textContent = "Nice hovering!";'   // changes the DOM, not the AX name
-  + '});'
-  + '</script>';
+const PAGE =
+  '<!doctype html><title>ce</title><h1>CE</h1>' +
+  '<div id="ed" contenteditable="true" role="textbox" aria-label="Notes">type here</div>' +
+  '<input id="plain" type="text" aria-label="Plain">' +
+  '<div id="hot" role="group">Hover me</div>' +
+  '<div id="cold" role="group">Inert</div>' +
+  '<script>' +
+  'document.getElementById("hot").addEventListener("mouseenter", function() {' +
+  '  this.textContent = "Nice hovering!";' + // changes the DOM, not the AX name
+  '});' +
+  '</script>';
 
 async function withPage(fn: (s: WirSession) => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-ce-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+  });
   try {
     await session.goto(`file://${join(dir, 'a.html')}`);
     await session.dispatch({ verb: 'read' });
     await fn(session);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 }
 
 const find1 = async (s: WirSession, name: string): Promise<string> => {
-  const r = await s.dispatch({ verb: 'find', name }) as Record<string, any>;
+  const r = (await s.dispatch({ verb: 'find', name })) as Record<string, any>;
   const m = (r['matches'] ?? [])[0];
   assert.ok(m, `precondition: ${name} findable: ${JSON.stringify(r['matches'])}`);
   return m.ref;
@@ -62,13 +68,19 @@ const find1 = async (s: WirSession, name: string): Promise<string> => {
 test('filling a contenteditable is verified, not contradicted', async () => {
   await withPage(async (s) => {
     const ref = await find1(s, 'type here');
-    const r = await s.dispatch(
-      { verb: 'act', ref, action: 'fill', value: 'banana' }) as Record<string, any>;
-    assert.equal(r['effect']?.verdict, 'verified',
-      `the write landed, so it is not contradicted: ${JSON.stringify(r['effect'])}`);
+    const r = (await s.dispatch({ verb: 'act', ref, action: 'fill', value: 'banana' })) as Record<
+      string,
+      any
+    >;
+    assert.equal(
+      r['effect']?.verdict,
+      'verified',
+      `the write landed, so it is not contradicted: ${JSON.stringify(r['effect'])}`,
+    );
     assert.equal(r['effect']?.evidence, 'value_set');
-    const text = await s.host.page.evaluate(() =>
-      (document.getElementById('ed') as HTMLElement).textContent);
+    const text = await s.host.page.evaluate(
+      () => (document.getElementById('ed') as HTMLElement).textContent,
+    );
     assert.equal(text, 'banana', 'and the oracle agrees the content is there');
   });
 });
@@ -76,12 +88,16 @@ test('filling a contenteditable is verified, not contradicted', async () => {
 test('hover observes a DOM change the target AX state cannot show', async () => {
   await withPage(async (s) => {
     const ref = await find1(s, 'Hover me');
-    const r = await s.dispatch({ verb: 'act', ref, action: 'hover' }) as Record<string, any>;
-    assert.equal(r['effect']?.verdict, 'verified',
-      `the page reacted, so the act must not deny it: ${JSON.stringify(r['effect'])}`);
+    const r = (await s.dispatch({ verb: 'act', ref, action: 'hover' })) as Record<string, any>;
+    assert.equal(
+      r['effect']?.verdict,
+      'verified',
+      `the page reacted, so the act must not deny it: ${JSON.stringify(r['effect'])}`,
+    );
     assert.equal(r['effect']?.evidence, 'dom_mutated');
-    const text = await s.host.page.evaluate(() =>
-      (document.getElementById('hot') as HTMLElement).textContent);
+    const text = await s.host.page.evaluate(
+      () => (document.getElementById('hot') as HTMLElement).textContent,
+    );
     assert.equal(text, 'Nice hovering!', 'the oracle confirms what changed');
   });
 });
@@ -91,11 +107,15 @@ test('CONTROL — fill on an ordinary input still compares its .value', async ()
   // to textContent wholesale rather than branching on isContentEditable, every
   // text field would report contradicted forever.
   await withPage(async (s) => {
-    const ov = await s.dispatch({ verb: 'read' }) as Record<string, any>;
+    const ov = (await s.dispatch({ verb: 'read' })) as Record<string, any>;
     const inp = (ov['controls'] ?? []).find((c: any) => String(c.name ?? '') === 'Plain');
     assert.ok(inp, 'precondition: the plain input compiled');
-    const r = await s.dispatch(
-      { verb: 'act', ref: inp.ref, action: 'fill', value: 'hello' }) as Record<string, any>;
+    const r = (await s.dispatch({
+      verb: 'act',
+      ref: inp.ref,
+      action: 'fill',
+      value: 'hello',
+    })) as Record<string, any>;
     assert.equal(r['effect']?.verdict, 'verified', JSON.stringify(r['effect']));
     assert.equal(r['effect']?.evidence, 'value_set');
   });
@@ -105,8 +125,11 @@ test('CONTROL — a hover that changes nothing still reports no change', async (
   // Arming the counter must not make every hover a pass.
   await withPage(async (s) => {
     const ref = await find1(s, 'Inert');
-    const r = await s.dispatch({ verb: 'act', ref, action: 'hover' }) as Record<string, any>;
-    assert.notEqual(r['effect']?.evidence, 'dom_mutated',
-      `nothing moved, so nothing is claimed: ${JSON.stringify(r['effect'])}`);
+    const r = (await s.dispatch({ verb: 'act', ref, action: 'hover' })) as Record<string, any>;
+    assert.notEqual(
+      r['effect']?.evidence,
+      'dom_mutated',
+      `nothing moved, so nothing is claimed: ${JSON.stringify(r['effect'])}`,
+    );
   });
 });

@@ -64,38 +64,58 @@ test('a key that mutates the page does not report that nothing was observed', as
     await session.goto(`file://${join(dir, 'a.html')}`);
     await session.dispatch({ verb: 'read' });
 
-    const menus = await session.dispatch({ verb: 'find', role: 'menu' }) as Record<string, any>;
+    const menus = (await session.dispatch({ verb: 'find', role: 'menu' })) as Record<string, any>;
     const refOf = (name: string) =>
       menus['matches'].find((m: any) => (m.name ?? '').includes(name))?.ref as string;
 
     // 1. The page mutates; nothing the target owns moves.
-    const reactive = await session.dispatch(
-      { verb: 'act', ref: refOf('Reactive'), action: 'key', value: 'ArrowDown' },
-    ) as Record<string, any>;
+    const reactive = (await session.dispatch({
+      verb: 'act',
+      ref: refOf('Reactive'),
+      action: 'key',
+      value: 'ArrowDown',
+    })) as Record<string, any>;
     const effect = reactive['effect'];
-    assert.equal(effect.verdict, 'unknown',
-      'mutations alone still never mint verified — that arm was removed by measurement');
-    assert.equal(effect.evidence, 'no_observable_change_yet',
-      'and the evidence string is unchanged: nothing the target owns moved');
-    assert.match(effect.delta.after, /mutationRecords=[1-9]/,
-      'the observed count is reported');
-    assert.match(effect.delta.after, /"verb":"read"/,
-      'and the delta names the call that settles what moved — the piece the '
-      + 'caller was missing when it read the string and stopped');
-    assert.match(effect.delta.after, /cannot be attributed/,
-      'while explicitly declining to claim the act caused them');
+    assert.equal(
+      effect.verdict,
+      'unknown',
+      'mutations alone still never mint verified — that arm was removed by measurement',
+    );
+    assert.equal(
+      effect.evidence,
+      'no_observable_change_yet',
+      'and the evidence string is unchanged: nothing the target owns moved',
+    );
+    assert.match(effect.delta.after, /mutationRecords=[1-9]/, 'the observed count is reported');
+    assert.match(
+      effect.delta.after,
+      /"verb":"read"/,
+      'and the delta names the call that settles what moved — the piece the ' +
+        'caller was missing when it read the string and stopped',
+    );
+    assert.match(
+      effect.delta.after,
+      /cannot be attributed/,
+      'while explicitly declining to claim the act caused them',
+    );
 
     // 2. THE CONTROL. With no mutation at all there is nothing to point at, so
     //    the delta must stay bare — no continuation offered for a page that did
     //    not move.
-    const inert = await session.dispatch(
-      { verb: 'act', ref: refOf('Inert'), action: 'key', value: 'ArrowDown' },
-    ) as Record<string, any>;
+    const inert = (await session.dispatch({
+      verb: 'act',
+      ref: refOf('Inert'),
+      action: 'key',
+      value: 'ArrowDown',
+    })) as Record<string, any>;
     assert.equal(inert['effect'].verdict, 'unknown');
     assert.equal(inert['effect'].evidence, 'no_observable_change_yet');
-    assert.doesNotMatch(inert['effect'].delta.after, /"verb":"read"/,
-      'a page that did not move offers no continuation — otherwise the hint is '
-      + 'noise on every unhandled key');
+    assert.doesNotMatch(
+      inert['effect'].delta.after,
+      /"verb":"read"/,
+      'a page that did not move offers no continuation — otherwise the hint is ' +
+        'noise on every unhandled key',
+    );
   } finally {
     await session.close();
   }

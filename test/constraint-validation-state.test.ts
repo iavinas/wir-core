@@ -43,22 +43,33 @@ test('a required control says so before anything is typed into it', async () => 
   const dir = mkdtempSync(join(tmpdir(), 'wir-constraint-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
-    assert.equal((await stateOf(session, 'Mail'))['required'], true,
-      'the browser knows this one is required');
-    assert.ok(!('required' in await stateOf(session, 'Note')),
-      'and the optional one is not marked — or the flag says nothing');
-  } finally { await session.close(); }
+    assert.equal(
+      (await stateOf(session, 'Mail'))['required'],
+      true,
+      'the browser knows this one is required',
+    );
+    assert.ok(
+      !('required' in (await stateOf(session, 'Note'))),
+      'and the optional one is not marked — or the flag says nothing',
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('after a submit the browser refused, the offending control is marked invalid', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-constraint-invalid-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -73,13 +84,20 @@ test('after a submit the browser refused, the offending control is marked invali
     const btn = ((submit['matches'] ?? []) as { ref: string }[])[0]!;
     await session.dispatch({ verb: 'act', ref: btn.ref, action: 'click' });
 
-    assert.equal((await stateOf(session, 'Mail'))['invalid'], true,
-      'the control the browser refused must say so, or the submit is a silent wall');
+    assert.equal(
+      (await stateOf(session, 'Mail'))['invalid'],
+      true,
+      'the control the browser refused must say so, or the submit is a silent wall',
+    );
 
     // And it clears when the value becomes acceptable — a flag that never clears
     // would be noise rather than a signal.
     await session.dispatch({ verb: 'act', ref: field.ref, action: 'fill', value: 'a@b.com' });
-    assert.ok(!(await stateOf(session, 'Mail'))['invalid'],
-      'a control the browser now accepts must not still read invalid');
-  } finally { await session.close(); }
+    assert.ok(
+      !(await stateOf(session, 'Mail'))['invalid'],
+      'a control the browser now accepts must not still read invalid',
+    );
+  } finally {
+    await session.close();
+  }
 });

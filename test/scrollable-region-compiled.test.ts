@@ -33,30 +33,36 @@ import { WirSession } from '../src/session.js';
 
 // The shape that was dropped: a scrolling box whose text is all in its children,
 // beside a plain box of the same construction that does not scroll.
-const PAGE = '<!doctype html><title>scrollers</title><h1>Scrollers</h1>'
-  + '<div id="box" style="height:100px;overflow-y:scroll">'
-  + Array.from({ length: 30 }, (_, i) => `<p>line ${i} of the long text</p>`).join('')
-  + '</div>'
-  + '<div id="plain"><p>a short paragraph in a box that does not scroll</p></div>';
+const PAGE =
+  '<!doctype html><title>scrollers</title><h1>Scrollers</h1>' +
+  '<div id="box" style="height:100px;overflow-y:scroll">' +
+  Array.from({ length: 30 }, (_, i) => `<p>line ${i} of the long text</p>`).join('') +
+  '</div>' +
+  '<div id="plain"><p>a short paragraph in a box that does not scroll</p></div>';
 
 async function withPage(fn: (s: WirSession) => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-scrollable-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+  });
   try {
     await session.goto(`file://${join(dir, 'a.html')}`);
     await session.dispatch({ verb: 'read' });
     await fn(session);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 }
 
 /** Every compiled node carrying an affordance, via find across the graph. */
 const scrollables = async (s: WirSession): Promise<any[]> => {
   const out: any[] = [];
   for (const role of ['generic', 'group', 'region']) {
-    const r = await s.dispatch({ verb: 'find', role }) as Record<string, any>;
-    for (const m of (r['matches'] ?? [])) {
+    const r = (await s.dispatch({ verb: 'find', role })) as Record<string, any>;
+    for (const m of r['matches'] ?? []) {
       if ((m.affordances ?? []).includes('scrollable')) out.push(m);
     }
   }
@@ -66,24 +72,33 @@ const scrollables = async (s: WirSession): Promise<any[]> => {
 test('a scrolling box is compiled, and its affordance says so', async () => {
   await withPage(async (s) => {
     const found = await scrollables(s);
-    assert.ok(found.length >= 1,
-      'the scroll container is in the graph at all — it used to be unknown_ref');
+    assert.ok(
+      found.length >= 1,
+      'the scroll container is in the graph at all — it used to be unknown_ref',
+    );
 
     // And it is USABLE, which is the whole point of admitting it.
     const before = await s.host.page.evaluate(() =>
-      Math.round((document.getElementById('box') as HTMLElement).scrollTop));
+      Math.round((document.getElementById('box') as HTMLElement).scrollTop),
+    );
     assert.equal(before, 0, 'precondition: at the top');
 
-    const r = await s.dispatch(
-      { verb: 'act', ref: found[0].ref, action: 'scroll', value: 'end' }) as Record<string, any>;
+    const r = (await s.dispatch({
+      verb: 'act',
+      ref: found[0].ref,
+      action: 'scroll',
+      value: 'end',
+    })) as Record<string, any>;
     assert.equal(r['rejected'], undefined, `it scrolls: ${JSON.stringify(r['rejected'])}`);
 
     const after = await s.host.page.evaluate(() => {
       const e = document.getElementById('box') as HTMLElement;
       return { top: Math.round(e.scrollTop), max: Math.round(e.scrollHeight - e.clientHeight) };
     });
-    assert.ok(after.top >= after.max - 4,
-      `and the ORACLE agrees it reached the bottom: ${JSON.stringify(after)}`);
+    assert.ok(
+      after.top >= after.max - 4,
+      `and the ORACLE agrees it reached the bottom: ${JSON.stringify(after)}`,
+    );
   });
 });
 
@@ -93,16 +108,21 @@ test('CONTROL — a box that does NOT scroll is still pruned', async () => {
   await withPage(async (s) => {
     const found = await scrollables(s);
     for (const m of found) {
-      const detail = await s.dispatch({ verb: 'read', target: m.ref }) as Record<string, any>;
+      const detail = (await s.dispatch({ verb: 'read', target: m.ref })) as Record<string, any>;
       const text = String(detail['node']?.text ?? '');
-      assert.doesNotMatch(text, /does not scroll/,
-        `the non-scrolling box must not be marked: ${text}`);
+      assert.doesNotMatch(
+        text,
+        /does not scroll/,
+        `the non-scrolling box must not be marked: ${text}`,
+      );
     }
     // The plain div carries no scrollable affordance anywhere in the graph.
-    const r = await s.dispatch({ verb: 'find', name: 'does not scroll' }) as Record<string, any>;
-    for (const m of (r['matches'] ?? [])) {
-      assert.ok(!(m.affordances ?? []).includes('scrollable'),
-        `nothing about the plain box scrolls: ${JSON.stringify(m)}`);
+    const r = (await s.dispatch({ verb: 'find', name: 'does not scroll' })) as Record<string, any>;
+    for (const m of r['matches'] ?? []) {
+      assert.ok(
+        !(m.affordances ?? []).includes('scrollable'),
+        `nothing about the plain box scrolls: ${JSON.stringify(m)}`,
+      );
     }
   });
 });

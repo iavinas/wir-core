@@ -41,52 +41,74 @@ test('line-per-div code content reads with newlines between rendered rows', asyn
   const dir = mkdtempSync(join(tmpdir(), 'wir-divlines-'));
   writeFileSync(join(dir, 'a.html'), DIV_LINES_PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: null, tracePath: null, debugScreenshots: false,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
-    const main = (overview['regions'] as { ref: string; role: string }[])
-      .find(r => r.role === 'main');
+    const main = (overview['regions'] as { ref: string; role: string }[]).find(
+      (r) => r.role === 'main',
+    );
     assert.ok(main, JSON.stringify(overview));
     const read = await session.dispatch({ verb: 'read', target: main.ref });
     const children = read['children'] as { name?: string; content?: string }[];
-    const code = children.find(c => c.name === 'Editor lines');
+    const code = children.find((c) => c.name === 'Editor lines');
     assert.ok(code, `code container not projected: ${JSON.stringify(children)}`);
-    assert.equal(code.content, 'alpha one\nbeta two\ngamma three',
-      'rendered rows inside a code context are line boundaries; same-row runs join with a space');
-    const prose = children.find(c => (c.content ?? '').includes('prose part'));
+    assert.equal(
+      code.content,
+      'alpha one\nbeta two\ngamma three',
+      'rendered rows inside a code context are line boundaries; same-row runs join with a space',
+    );
+    const prose = children.find((c) => (c.content ?? '').includes('prose part'));
     assert.ok(prose, JSON.stringify(children));
-    assert.equal(prose.content, 'prose part · alpha · beta',
-      'prose previews stay byte-identical');
-  } finally { await session.close(); }
+    assert.equal(prose.content, 'prose part · alpha · beta', 'prose previews stay byte-identical');
+  } finally {
+    await session.close();
+  }
 });
 
 test('per-line pre content reads back with newlines between lines and no invented glyphs', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-codelines-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: null, tracePath: null, debugScreenshots: false,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
-    const main = (overview['regions'] as { ref: string; role: string }[])
-      .find(r => r.role === 'main');
+    const main = (overview['regions'] as { ref: string; role: string }[]).find(
+      (r) => r.role === 'main',
+    );
     assert.ok(main, JSON.stringify(overview));
     const read = await session.dispatch({ verb: 'read', target: main.ref });
     const children = read['children'] as { name?: string; content?: string }[];
-    const code = children.find(c => c.name === 'File contents');
+    const code = children.find((c) => c.name === 'File contents');
     assert.ok(code, `code container not projected: ${JSON.stringify(children)}`);
-    assert.equal(code.content, 'line one\nline two\nline three',
-      'a pre boundary is a line boundary; runs inside a line join with a space');
-    const prose = children.find(c => (c.content ?? '').includes('prose part'));
+    assert.equal(
+      code.content,
+      'line one\nline two\nline three',
+      'a pre boundary is a line boundary; runs inside a line join with a space',
+    );
+    const prose = children.find((c) => (c.content ?? '').includes('prose part'));
     assert.ok(prose, JSON.stringify(children));
-    assert.equal(prose.content, 'prose part · alpha · beta',
-      'prose runs keep the distinct-run separator — measured preview behavior');
-  } finally { await session.close(); }
+    assert.equal(
+      prose.content,
+      'prose part · alpha · beta',
+      'prose runs keep the distinct-run separator — measured preview behavior',
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 // The fixture above pins this projection with a shape whose parent text precedes
@@ -101,28 +123,40 @@ test('own text keeps its position among the children it wraps', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-order-'));
   writeFileSync(join(dir, 'a.html'), DIV_LINES_PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: null, tracePath: null, debugScreenshots: false,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
-    const main = (overview['regions'] as { ref: string; role: string }[])
-      .find(x => x.role === 'main');
+    const main = (overview['regions'] as { ref: string; role: string }[]).find(
+      (x) => x.role === 'main',
+    );
     assert.ok(main, JSON.stringify(overview));
     const r = await session.dispatch({ verb: 'read', target: main.ref });
     const kids = (r['children'] ?? []) as { content?: string; text?: string }[];
-    const wrap = kids.find(c => (c.content ?? '').includes('lead in'));
+    const wrap = kids.find((c) => (c.content ?? '').includes('lead in'));
     assert.ok(wrap, `needed the wrapping paragraph: ${JSON.stringify(kids)}`);
 
-    assert.equal(wrap.content, 'lead in · middle · trailing words',
-      'text that sits after a child must be projected after it');
+    assert.equal(
+      wrap.content,
+      'lead in · middle · trailing words',
+      'text that sits after a child must be projected after it',
+    );
 
     // And the own-text field must not offer the spliced concatenation as a
     // reading: "lead in trailing words" is a sentence the page never contains.
-    assert.ok(!/lead in trailing/.test(JSON.stringify(wrap)),
-      `the spliced concatenation must not be emitted: ${JSON.stringify(wrap)}`);
-  } finally { await session.close(); }
+    assert.ok(
+      !/lead in trailing/.test(JSON.stringify(wrap)),
+      `the spliced concatenation must not be emitted: ${JSON.stringify(wrap)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 // A syntax highlighter wraps every token in its own span, so a source line
@@ -157,26 +191,34 @@ test('a highlighted line rejoins into the source it came from', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-hl-'));
   writeFileSync(join(dir, 'a.html'), HIGHLIGHTED);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
-    const main = (overview['regions'] as { ref: string; role: string }[])
-      .find(x => x.role === 'main');
+    const main = (overview['regions'] as { ref: string; role: string }[]).find(
+      (x) => x.role === 'main',
+    );
     assert.ok(main, JSON.stringify(overview));
     const r = await session.dispatch({ verb: 'read', target: main.ref });
     const kids = (r['children'] ?? []) as { content?: string }[];
-    const joined = kids.map(k => k.content ?? '').join('\n');
+    const joined = kids.map((k) => k.content ?? '').join('\n');
 
-    assert.match(joined, /<html lang="en">/,
-      `tokens must rejoin into the source line: ${JSON.stringify(joined)}`);
+    assert.match(
+      joined,
+      /<html lang="en">/,
+      `tokens must rejoin into the source line: ${JSON.stringify(joined)}`,
+    );
     assert.match(joined, /<head>/, JSON.stringify(joined));
     // The two failure modes this replaces, named so a regression cannot pass by
     // trading one for the other.
     assert.ok(!/< html/.test(joined), `spaces invented around punctuation: ${joined}`);
     assert.ok(!/htmllang/.test(joined), `attributes fused together: ${joined}`);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('prose is unaffected by the raw-run path', async () => {
@@ -184,22 +226,30 @@ test('prose is unaffected by the raw-run path', async () => {
   // paragraph would start carrying the page's source indentation — so pin the
   // normalised path with the shape that exposed B1.
   const dir = mkdtempSync(join(tmpdir(), 'wir-prose-'));
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>p</title>
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>p</title>
     <main><p>You can invite a new member to
-      <strong>empathy-prompts</strong>   or invite another group.</p></main>`);
+      <strong>empathy-prompts</strong>   or invite another group.</p></main>`,
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
-    const main = (overview['regions'] as { ref: string; role: string }[])
-      .find(x => x.role === 'main');
+    const main = (overview['regions'] as { ref: string; role: string }[]).find(
+      (x) => x.role === 'main',
+    );
     assert.ok(main, JSON.stringify(overview));
     const text = JSON.stringify(await session.dispatch({ verb: 'read', target: main.ref }));
     assert.match(text, /empathy-prompts/, text);
     assert.ok(!/ {3}/.test(text), `source indentation leaked into prose: ${text}`);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 // Both halves of the raw-run rule, each found by adversarial review of the fix
@@ -222,42 +272,59 @@ test('prose is unaffected by the raw-run path', async () => {
 // the text whether or not it has neighbours.
 test('a space between two inline code elements survives', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-fuse-'));
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>fuse</title>
-    <main><p>Run <code>npm</code> <code>install</code> now.</p></main>`);
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>fuse</title>
+    <main><p>Run <code>npm</code> <code>install</code> now.</p></main>`,
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
-    const main = (overview['regions'] as { ref: string; role: string }[])
-      .find(x => x.role === 'main');
+    const main = (overview['regions'] as { ref: string; role: string }[]).find(
+      (x) => x.role === 'main',
+    );
     assert.ok(main, JSON.stringify(overview));
     const r = await session.dispatch({ verb: 'read', target: main.ref });
     const text = JSON.stringify(r);
-    assert.ok(!/npminstall/.test(text),
-      `the page's own words were fused: ${text}`);
+    assert.ok(!/npminstall/.test(text), `the page's own words were fused: ${text}`);
     assert.match(text, /npm install/, text);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test("a plain pre block's newlines are shown, not just held", async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-lonepre-'));
-  writeFileSync(join(dir, 'a.html'),
-    '<!doctype html><title>lone</title><main><pre>#!/bin/sh\necho one\necho two\n</pre></main>');
+  writeFileSync(
+    join(dir, 'a.html'),
+    '<!doctype html><title>lone</title><main><pre>#!/bin/sh\necho one\necho two\n</pre></main>',
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
-    const main = (overview['regions'] as { ref: string; role: string }[])
-      .find(x => x.role === 'main');
+    const main = (overview['regions'] as { ref: string; role: string }[]).find(
+      (x) => x.role === 'main',
+    );
     assert.ok(main, JSON.stringify(overview));
     const r = await session.dispatch({ verb: 'read', target: main.ref });
     const kid = ((r['children'] ?? []) as { content?: string; text?: string }[])[0];
     const shown = kid?.content ?? kid?.text ?? '';
-    assert.match(shown, /#!\/bin\/sh\necho one\necho two/,
-      `the runtime holds these newlines in the raw run and must not flatten them: ${JSON.stringify(shown)}`);
-  } finally { await session.close(); }
+    assert.match(
+      shown,
+      /#!\/bin\/sh\necho one\necho two/,
+      `the runtime holds these newlines in the raw run and must not flatten them: ${JSON.stringify(shown)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

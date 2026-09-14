@@ -15,8 +15,11 @@ async function startOn(html: string): Promise<{ session: WirSession; dir: string
   writeFileSync(join(dir, 'a.html'), html);
   writeFileSync(join(dir, 'b.html'), '<!doctype html><title>b</title><h1>Page B</h1>');
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
   await session.goto(`file://${dir}/a.html`);
@@ -40,7 +43,9 @@ test('fragment-href toggle reads verified target_state_changed, not unknown', as
     const effect = acted['effect'] as { verdict: string; evidence: string };
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     assert.equal(effect.evidence, 'target_state_changed');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('a click whose effect lands elsewhere in the document reads dom_mutated', async () => {
@@ -53,19 +58,25 @@ test('a click whose effect lands elsewhere in the document reads dom_mutated', a
     const effect = acted['effect'] as { verdict: string; evidence: string };
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     assert.equal(effect.evidence, 'dom_mutated');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('a real link still verifies as navigated_to_destination', async () => {
   const { session, dir } = await startOn('');
   try {
     await session.goto(`file://${dir}/a.html`);
-    writeFileSync(join(dir, 'a.html'),
-      `<!doctype html><title>a</title><h1>Host</h1><a href="file://${dir}/b.html">to page b</a>`);
+    writeFileSync(
+      join(dir, 'a.html'),
+      `<!doctype html><title>a</title><h1>Host</h1><a href="file://${dir}/b.html">to page b</a>`,
+    );
     await session.goto(`file://${dir}/a.html`);
     const acted = await clickByName(session, 'to page b');
     const effect = acted['effect'] as { verdict: string; evidence: string };
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     assert.equal(effect.evidence, 'navigated_to_destination');
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });

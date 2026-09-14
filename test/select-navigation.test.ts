@@ -66,22 +66,30 @@ function serve(): Promise<{ server: Server; base: string }> {
       return;
     }
     if (req.method === 'POST' && req.url === '/apply') {
-      setTimeout(() => { res.writeHead(302, { location: '/applied' }); res.end(); }, SERVER_THINK_MS);
+      setTimeout(() => {
+        res.writeHead(302, { location: '/applied' });
+        res.end();
+      }, SERVER_THINK_MS);
       return;
     }
-    const body = req.url === '/'
-      ? PAGE
-      : `<!doctype html><title>${req.url}</title><h1>Page ${req.url}</h1>`;
-    res.writeHead(200, { 'content-type': 'text/html' }); res.end(body);
+    const body =
+      req.url === '/' ? PAGE : `<!doctype html><title>${req.url}</title><h1>Page ${req.url}</h1>`;
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end(body);
   });
-  return new Promise(resolve => server.listen(0, '127.0.0.1', () => {
-    const addr = server.address() as { port: number };
-    resolve({ server, base: `http://127.0.0.1:${addr.port}` });
-  }));
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number };
+      resolve({ server, base: `http://127.0.0.1:${addr.port}` });
+    }),
+  );
 }
 
-async function selectByName(session: WirSession, name: string, value: string):
-    Promise<Record<string, unknown>> {
+async function selectByName(
+  session: WirSession,
+  name: string,
+  value: string,
+): Promise<Record<string, unknown>> {
   const found = await session.dispatch({ verb: 'find', name, role: 'combobox' });
   const ref = (found['matches'] as { ref: string }[])[0]?.ref;
   assert.ok(ref, `not found: ${name} (${JSON.stringify(found['matches'])})`);
@@ -90,13 +98,17 @@ async function selectByName(session: WirSession, name: string, value: string):
 
 function startSession(): Promise<WirSession> {
   return WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
-    harPath: null, tracePath: null, debugScreenshots: false,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
   });
 }
 
 function closeServer(server: Server): Promise<void> {
-  return new Promise(resolve => server.close(() => resolve()));
+  return new Promise((resolve) => server.close(() => resolve()));
 }
 
 test('a select whose change handler navigates reports the navigation, not a local value', async () => {
@@ -105,10 +117,16 @@ test('a select whose change handler navigates reports the navigation, not a loca
   try {
     await session.goto(`${base}/`);
     const acted = await selectByName(session, 'Sort By', 'Price');
-    const effect = acted['effect'] as
-      { verdict: string; evidence: string; delta: { before: string; after: string } };
-    assert.equal(effect.evidence, 'navigation_get',
-      `the document was replaced by a GET; the act must say so: ${JSON.stringify(acted)}`);
+    const effect = acted['effect'] as {
+      verdict: string;
+      evidence: string;
+      delta: { before: string; after: string };
+    };
+    assert.equal(
+      effect.evidence,
+      'navigation_get',
+      `the document was replaced by a GET; the act must say so: ${JSON.stringify(acted)}`,
+    );
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     // The act waited for the browser: the URL it reports is the one that landed,
     // not the one the page still showed when the change handler returned.
@@ -119,10 +137,15 @@ test('a select whose change handler navigates reports the navigation, not a loca
     // A GET navigation is local-only evidence by design: it proves a link-follow,
     // never a site mutation. The gate must not spend it.
     const finish = await session.dispatch({
-      verb: 'finish', answer: '', evidenceRefs: [acted['actRef'] as string],
+      verb: 'finish',
+      answer: '',
+      evidenceRefs: [acted['actRef'] as string],
     });
-    assert.equal((finish['rejected'] as { kind: string } | undefined)?.kind, 'finish_rejected',
-      `navigation_get is local-only; the gate must refuse it: ${JSON.stringify(finish)}`);
+    assert.equal(
+      (finish['rejected'] as { kind: string } | undefined)?.kind,
+      'finish_rejected',
+      `navigation_get is local-only; the gate must refuse it: ${JSON.stringify(finish)}`,
+    );
   } finally {
     await session.close();
     await closeServer(server);
@@ -135,10 +158,16 @@ test('a select that submits its form reaches navigation_post', async () => {
   try {
     await session.goto(`${base}/`);
     const acted = await selectByName(session, 'Store View', 'Main Website');
-    const effect = acted['effect'] as
-      { verdict: string; evidence: string; delta: { after: string } };
-    assert.equal(effect.evidence, 'navigation_post',
-      `the change submitted a POST form: ${JSON.stringify(acted)}`);
+    const effect = acted['effect'] as {
+      verdict: string;
+      evidence: string;
+      delta: { after: string };
+    };
+    assert.equal(
+      effect.evidence,
+      'navigation_post',
+      `the change submitted a POST form: ${JSON.stringify(acted)}`,
+    );
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     assert.match(effect.delta.after, /answered 302/);
   } finally {
@@ -153,8 +182,11 @@ test('a select that navigates nothing reads exactly as before — the forum-pick
   try {
     await session.goto(`${base}/`);
     const acted = await selectByName(session, 'Choose a forum', 'books');
-    const effect = acted['effect'] as
-      { verdict: string; evidence: string; delta: { before: string; after: string } };
+    const effect = acted['effect'] as {
+      verdict: string;
+      evidence: string;
+      delta: { before: string; after: string };
+    };
     assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
     assert.equal(effect.evidence, 'option_selected', JSON.stringify(acted));
     assert.equal(effect.delta.before, 'value=""');

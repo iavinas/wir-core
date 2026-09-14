@@ -61,8 +61,11 @@ function serve(): Promise<{ server: Server; url: string; close: () => void }> {
 async function session(): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-anon-'));
   return WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: join(dir, 'network.har'), tracePath: join(dir, 'trace.zip'),
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: join(dir, 'network.har'),
+    tracePath: join(dir, 'trace.zip'),
     debugScreenshots: false,
   });
 }
@@ -76,13 +79,17 @@ test('an anonymous form control carries its own field name in find', async () =>
     const found = await s.dispatch({ verb: 'find', role: 'textbox' });
     const matches = found['matches'] as Record<string, unknown>[];
 
-    const anon = matches.filter(m => String(m['name'] ?? '') === '');
-    assert.ok(anon.length >= 4,
-      `the filter inputs must compile: ${JSON.stringify(found).slice(0, 500)}`);
-    const handles = anon.map(m => m['fieldName']);
+    const anon = matches.filter((m) => String(m['name'] ?? '') === '');
+    assert.ok(
+      anon.length >= 4,
+      `the filter inputs must compile: ${JSON.stringify(found).slice(0, 500)}`,
+    );
+    const handles = anon.map((m) => m['fieldName']);
     for (const want of ['review_id', 'title', 'nickname', 'detail']) {
-      assert.ok(handles.includes(want),
-        `an anonymous input must say which field it is (${want}): ${JSON.stringify(anon)}`);
+      assert.ok(
+        handles.includes(want),
+        `an anonymous input must say which field it is (${want}): ${JSON.stringify(anon)}`,
+      );
     }
   } finally {
     await s.close();
@@ -103,12 +110,18 @@ test('a control with a real accessible name gets no second handle', async () => 
     const found = await s.dispatch({ verb: 'find', role: 'textbox' });
     const matches = found['matches'] as Record<string, unknown>[];
 
-    const named = matches.find(m => String(m['name'] ?? '').includes('Search'));
+    const named = matches.find((m) => String(m['name'] ?? '').includes('Search'));
     assert.ok(named, `the labelled input must compile: ${JSON.stringify(matches)}`);
-    assert.equal(named['fieldName'], undefined,
-      `a named control needs no second handle: ${JSON.stringify(named)}`);
-    assert.equal(named['name'], 'Search',
-      'and its accname is untouched — the page\'s own word, not the attribute');
+    assert.equal(
+      named['fieldName'],
+      undefined,
+      `a named control needs no second handle: ${JSON.stringify(named)}`,
+    );
+    assert.equal(
+      named['name'],
+      'Search',
+      "and its accname is untouched — the page's own word, not the attribute",
+    );
   } finally {
     await s.close();
     site.close();
@@ -124,9 +137,11 @@ test('read carries the handle too', async () => {
     await s.goto(site.url);
     const page = await s.dispatch({ verb: 'read' });
     const controls = page['controls'] as Record<string, unknown>[];
-    const anon = controls.filter(c => c['role'] === 'textbox' && String(c['name'] ?? '') === '');
-    assert.ok(anon.some(c => c['fieldName'] === 'detail'),
-      `read must show it as well as find: ${JSON.stringify(anon)}`);
+    const anon = controls.filter((c) => c['role'] === 'textbox' && String(c['name'] ?? '') === '');
+    assert.ok(
+      anon.some((c) => c['fieldName'] === 'detail'),
+      `read must show it as well as find: ${JSON.stringify(anon)}`,
+    );
   } finally {
     await s.close();
     site.close();

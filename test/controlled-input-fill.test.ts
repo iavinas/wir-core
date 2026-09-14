@@ -65,7 +65,9 @@ test('a filled controlled input still holds its value after the form re-renders'
   const dir = mkdtempSync(join(tmpdir(), 'wir-controlled-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -75,7 +77,11 @@ test('a filled controlled input still holds its value after the form re-renders'
     assert.ok(field, `precondition: the date field is findable: ${JSON.stringify(found)}`);
 
     const filled = await session.dispatch({
-      verb: 'act', ref: field.ref, action: 'fill', value: '1990-01-15' });
+      verb: 'act',
+      ref: field.ref,
+      action: 'fill',
+      value: '1990-01-15',
+    });
     assert.ok(!filled['rejected'], JSON.stringify(filled['rejected']));
 
     // The render that used to wipe it. If the framework never saw the change,
@@ -87,8 +93,13 @@ test('a filled controlled input still holds its value after the form re-renders'
 
     const after = await session.dispatch({ verb: 'read', target: field.ref });
     const node = after['node'] as Record<string, unknown>;
-    assert.equal(node['value'], '1990-01-15',
+    assert.equal(
+      node['value'],
+      '1990-01-15',
       `verified/value_set must still be true after a re-render — a fill that ` +
-      `empties itself is a false verified: ${JSON.stringify(after)}`);
-  } finally { await session.close(); }
+        `empties itself is a false verified: ${JSON.stringify(after)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

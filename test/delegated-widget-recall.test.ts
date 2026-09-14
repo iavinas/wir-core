@@ -41,7 +41,9 @@ test('a role-bearing widget with only a delegated handler is in read.controls', 
   const dir = mkdtempSync(join(tmpdir(), 'wir-delegated-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -49,22 +51,28 @@ test('a role-bearing widget with only a delegated handler is in read.controls', 
     // What find can reach, by role — the set read must not be smaller than.
     const found = await session.dispatch({ verb: 'find', role: 'button' });
     const matches = (found['matches'] ?? []) as { ref: string; name?: string }[];
-    const widget = matches.find(m => (m.name ?? '').includes('Country'));
+    const widget = matches.find((m) => (m.name ?? '').includes('Country'));
     assert.ok(widget, `find must reach the delegated widget: ${JSON.stringify(found)}`);
 
     const overview = await session.dispatch({ verb: 'read' });
     const controls = (overview['controls'] ?? []) as { ref: string; name?: string }[];
-    assert.ok(controls.some(c => c.ref === widget.ref),
+    assert.ok(
+      controls.some((c) => c.ref === widget.ref),
       'read.controls must contain every control find returns — a list that omits one ' +
-      `while reporting controlsTotal ${String(overview['controlsTotal'])} with ` +
-      `withheld ${JSON.stringify(overview['withheld'] ?? null)} claims completeness it does not have: ` +
-      JSON.stringify(controls.map(c => c.name)));
+        `while reporting controlsTotal ${String(overview['controlsTotal'])} with ` +
+        `withheld ${JSON.stringify(overview['withheld'] ?? null)} claims completeness it does not have: ` +
+        JSON.stringify(controls.map((c) => c.name)),
+    );
 
     // And the fix must not turn every div into a control: a plain div carries no
     // role and stays out, or "show everything" would pass the assertion above.
-    assert.ok(!controls.some(c => (c.name ?? '').includes('just a div')),
-      `a div with no widget role is not a control: ${JSON.stringify(controls.map(c => c.name))}`);
-  } finally { await session.close(); }
+    assert.ok(
+      !controls.some((c) => (c.name ?? '').includes('just a div')),
+      `a div with no widget role is not a control: ${JSON.stringify(controls.map((c) => c.name))}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('the widget read now shows is one act can actually drive', async () => {
@@ -73,19 +81,26 @@ test('the widget read now shows is one act can actually drive', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-delegated-act-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const overview = await session.dispatch({ verb: 'read' });
     const controls = (overview['controls'] ?? []) as { ref: string; name?: string }[];
-    const widget = controls.find(c => (c.name ?? '').includes('Country'));
+    const widget = controls.find((c) => (c.name ?? '').includes('Country'));
     assert.ok(widget, 'precondition: the widget is in controls');
 
     const acted = await session.dispatch({ verb: 'act', ref: widget.ref, action: 'click' });
     assert.ok(!acted['rejected'], `act must accept it: ${JSON.stringify(acted['rejected'])}`);
     const title = await session.dispatch({ verb: 'read' });
-    assert.equal(title['title'], 'activated',
-      `the delegated handler must have run: ${JSON.stringify(acted)}`);
-  } finally { await session.close(); }
+    assert.equal(
+      title['title'],
+      'activated',
+      `the delegated handler must have run: ${JSON.stringify(acted)}`,
+    );
+  } finally {
+    await session.close();
+  }
 });

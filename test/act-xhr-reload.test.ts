@@ -60,7 +60,7 @@ function serve(): Promise<{ server: Server; url: string; close: () => void }> {
         res.end('{}');
         return;
       }
-      if (req.url === '/silent') return;   // socket held open, never answered
+      if (req.url === '/silent') return; // socket held open, never answered
       // The document — slow enough that a commit missed at classification time
       // stays missed, which is what made the live defect visible.
       setTimeout(() => {
@@ -71,7 +71,8 @@ function serve(): Promise<{ server: Server; url: string; close: () => void }> {
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address() as { port: number };
       resolve({
-        server, url: `http://127.0.0.1:${addr.port}/`,
+        server,
+        url: `http://127.0.0.1:${addr.port}/`,
         close: () => {
           (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
           server.close();
@@ -83,8 +84,12 @@ function serve(): Promise<{ server: Server; url: string; close: () => void }> {
 
 async function start(url: string): Promise<WirSession> {
   const session = await WirSession.start({
-    headless: true, expectedAction: 'RETRIEVE', storageStatePath: null,
-    harPath: null, tracePath: null, debugScreenshots: false,
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
   });
   await session.goto(url);
   return session;
@@ -97,46 +102,52 @@ async function clickByName(session: WirSession, name: string): Promise<Record<st
   return session.dispatch({ verb: 'act', ref, action: 'click' });
 }
 
-test('an XHR-committed click whose page then reloads itself reports the replacement',
-  async () => {
-    const { url, close } = await serve();
-    const session = await start(url);
-    try {
-      const before = session.currentEpoch();
-      const acted = await clickByName(session, 'Invite');
-      const effect = acted['effect'] as { verdict: string; evidence: string };
+test('an XHR-committed click whose page then reloads itself reports the replacement', async () => {
+  const { url, close } = await serve();
+  const session = await start(url);
+  try {
+    const before = session.currentEpoch();
+    const acted = await clickByName(session, 'Invite');
+    const effect = acted['effect'] as { verdict: string; evidence: string };
 
-      // Ground truth first: the document really was replaced during that act.
-      assert.notEqual(session.currentEpoch(), before,
-        'precondition: the reload committed');
-      assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
-      assert.equal(effect.evidence, 'navigation_get', JSON.stringify(acted));
-      // And the act must not have told the model that nothing happened.
-      assert.doesNotMatch(String((acted['effect'] as { delta: { after: string } }).delta.after),
-        /\(gone\)/, 'the dead-node delta is the defect signature');
-    } finally { await session.close(); close(); }
-  });
+    // Ground truth first: the document really was replaced during that act.
+    assert.notEqual(session.currentEpoch(), before, 'precondition: the reload committed');
+    assert.equal(effect.verdict, 'verified', JSON.stringify(acted));
+    assert.equal(effect.evidence, 'navigation_get', JSON.stringify(acted));
+    // And the act must not have told the model that nothing happened.
+    assert.doesNotMatch(
+      String((acted['effect'] as { delta: { after: string } }).delta.after),
+      /\(gone\)/,
+      'the dead-node delta is the defect signature',
+    );
+  } finally {
+    await session.close();
+    close();
+  }
+});
 
-test('CONTROL — a 2xx XHR with NO document replacement still mints nothing',
-  async () => {
-    // This one is expected to pass with and without the fix; that IS its job.
-    // Same request shape, same act window, same 2xx — only the reload differs.
-    // If the second sample ever starts manufacturing a navigation, or if this
-    // gets widened into minting request_committed off a bare 2xx (the arm at
-    // core/act.ts is deliberately still gated behind observed mutations, and the
-    // G1 bound for a wider population has never been re-derived), this fails.
-    const { url, close } = await serve();
-    const session = await start(url);
-    try {
-      const before = session.currentEpoch();
-      const acted = await clickByName(session, 'Ping only');
-      const effect = acted['effect'] as { verdict: string; evidence: string };
-      assert.equal(session.currentEpoch(), before, 'precondition: same document');
-      assert.equal(effect.verdict, 'unknown', JSON.stringify(acted));
-      assert.notEqual(effect.evidence, 'navigation_get');
-      assert.notEqual(effect.evidence, 'request_committed');
-    } finally { await session.close(); close(); }
-  });
+test('CONTROL — a 2xx XHR with NO document replacement still mints nothing', async () => {
+  // This one is expected to pass with and without the fix; that IS its job.
+  // Same request shape, same act window, same 2xx — only the reload differs.
+  // If the second sample ever starts manufacturing a navigation, or if this
+  // gets widened into minting request_committed off a bare 2xx (the arm at
+  // core/act.ts is deliberately still gated behind observed mutations, and the
+  // G1 bound for a wider population has never been re-derived), this fails.
+  const { url, close } = await serve();
+  const session = await start(url);
+  try {
+    const before = session.currentEpoch();
+    const acted = await clickByName(session, 'Ping only');
+    const effect = acted['effect'] as { verdict: string; evidence: string };
+    assert.equal(session.currentEpoch(), before, 'precondition: same document');
+    assert.equal(effect.verdict, 'unknown', JSON.stringify(acted));
+    assert.notEqual(effect.evidence, 'navigation_get');
+    assert.notEqual(effect.evidence, 'request_committed');
+  } finally {
+    await session.close();
+    close();
+  }
+});
 
 test('CONTROL — an unanswered request mints nothing and stays bounded', async () => {
   // The other half of the brief's negative: the request is sent and never
@@ -163,5 +174,8 @@ test('CONTROL — an unanswered request mints nothing and stays bounded', async 
     assert.equal(effect.verdict, 'unknown', JSON.stringify(acted));
     assert.notEqual(effect.evidence, 'navigation_get');
     assert.ok(ms < 8_000, `the act must stay bounded; it took ${ms}ms`);
-  } finally { await session.close(); close(); }
+  } finally {
+    await session.close();
+    close();
+  }
 });

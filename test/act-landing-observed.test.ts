@@ -19,52 +19,68 @@ import { createServer, type Server } from 'node:http';
 import { test } from 'node:test';
 import { WirSession } from '../src/session.js';
 
-test('navigate accepts the URL an act just landed on, with no read in between',
-  async () => {
-    const srv = await new Promise<{ url: string; close: () => void }>(resolve => {
-      // The link points at /go, which REDIRECTS to /second. That matters: seenUrls
-      // is also fed from every compiled href, so a fixture whose link points
-      // straight at the destination passes with or without the fix — the first
-      // draft of this test did exactly that and proved nothing. The landing URL has
-      // to be one no href ever carried.
-      const s: Server = createServer((q, r) => {
-        if (q.url === '/go') {
-          r.writeHead(302, { location: '/second' });
-          r.end();
-          return;
-        }
-        r.writeHead(200, { 'content-type': 'text/html' });
-        r.end(q.url === '/second'
+test('navigate accepts the URL an act just landed on, with no read in between', async () => {
+  const srv = await new Promise<{ url: string; close: () => void }>((resolve) => {
+    // The link points at /go, which REDIRECTS to /second. That matters: seenUrls
+    // is also fed from every compiled href, so a fixture whose link points
+    // straight at the destination passes with or without the fix — the first
+    // draft of this test did exactly that and proved nothing. The landing URL has
+    // to be one no href ever carried.
+    const s: Server = createServer((q, r) => {
+      if (q.url === '/go') {
+        r.writeHead(302, { location: '/second' });
+        r.end();
+        return;
+      }
+      r.writeHead(200, { 'content-type': 'text/html' });
+      r.end(
+        q.url === '/second'
           ? '<!doctype html><title>second</title><h1>Second page</h1>'
-          : '<!doctype html><title>first</title><h1>First</h1><a href="/go">Go second</a>');
-      });
-      s.listen(0, '127.0.0.1', () => {
-        const port = (s.address() as { port: number }).port;
-        resolve({ url: `http://127.0.0.1:${port}`, close: () => s.close() });
-      });
+          : '<!doctype html><title>first</title><h1>First</h1><a href="/go">Go second</a>',
+      );
     });
-
-    const session = await WirSession.start({
-      headless: true, expectedAction: 'RETRIEVE', storageStatePath: null });
-    try {
-      await session.goto(srv.url);
-      const overview = await session.dispatch({ verb: 'read' }) as Record<string, any>;
-      const link = (overview['controls'] ?? [])
-        .find((c: any) => String(c.name ?? '').includes('Go second'));
-      assert.ok(link, 'precondition: the link is in the overview');
-
-      const acted = await session.dispatch(
-        { verb: 'act', ref: link.ref, action: 'click' }) as Record<string, any>;
-      assert.match(String(acted['effect']?.delta?.after ?? ''), /\/second/,
-        'precondition: the act reports the destination in its own delta');
-
-      // NO read in between. That intervening read is the workaround this removes.
-      const nav = await session.dispatch(
-        { verb: 'navigate', url: `${srv.url}/second` }) as Record<string, any>;
-      assert.equal(nav['rejected'], undefined,
-        `a destination the act reported is observed: ${JSON.stringify(nav['rejected'])}`);
-    } finally {
-      await session.close();
-      srv.close();
-    }
+    s.listen(0, '127.0.0.1', () => {
+      const port = (s.address() as { port: number }).port;
+      resolve({ url: `http://127.0.0.1:${port}`, close: () => s.close() });
+    });
   });
+
+  const session = await WirSession.start({
+    headless: true,
+    expectedAction: 'RETRIEVE',
+    storageStatePath: null,
+  });
+  try {
+    await session.goto(srv.url);
+    const overview = (await session.dispatch({ verb: 'read' })) as Record<string, any>;
+    const link = (overview['controls'] ?? []).find((c: any) =>
+      String(c.name ?? '').includes('Go second'),
+    );
+    assert.ok(link, 'precondition: the link is in the overview');
+
+    const acted = (await session.dispatch({
+      verb: 'act',
+      ref: link.ref,
+      action: 'click',
+    })) as Record<string, any>;
+    assert.match(
+      String(acted['effect']?.delta?.after ?? ''),
+      /\/second/,
+      'precondition: the act reports the destination in its own delta',
+    );
+
+    // NO read in between. That intervening read is the workaround this removes.
+    const nav = (await session.dispatch({ verb: 'navigate', url: `${srv.url}/second` })) as Record<
+      string,
+      any
+    >;
+    assert.equal(
+      nav['rejected'],
+      undefined,
+      `a destination the act reported is observed: ${JSON.stringify(nav['rejected'])}`,
+    );
+  } finally {
+    await session.close();
+    srv.close();
+  }
+});

@@ -56,31 +56,45 @@ function serve(): Promise<{ server: Server; url: string; close: () => void }> {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
       if (req.method === 'POST' && req.url === '/api/v4/projects/183/invitations') {
-        res.writeHead(201, { 'content-type': 'application/json' }); res.end('{}'); return;
+        res.writeHead(201, { 'content-type': 'application/json' });
+        res.end('{}');
+        return;
       }
       if (req.method === 'POST' && req.url === '/session') {
-        res.writeHead(302, { location: '/' }); res.end(); return;
+        res.writeHead(302, { location: '/' });
+        res.end();
+        return;
       }
       if (req.method === 'POST' && req.url?.startsWith('/item/')) {
-        res.writeHead(200, { 'content-type': 'application/json' }); res.end('{}'); return;
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end('{}');
+        return;
       }
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end(req.url === '/fanout' ? FANOUT : PAGE);
     });
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address() as { port: number };
-      resolve({ server, url: `http://127.0.0.1:${addr.port}/`, close: () => {
-        (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
-        server.close();
-      } });
+      resolve({
+        server,
+        url: `http://127.0.0.1:${addr.port}/`,
+        close: () => {
+          (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
+          server.close();
+        },
+      });
     });
   });
 }
 
 async function startSession(url: string): Promise<WirSession> {
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
-    harPath: null, tracePath: null, debugScreenshots: false,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    harPath: null,
+    tracePath: null,
+    debugScreenshots: false,
   });
   await session.goto(url);
   return session;
@@ -94,10 +108,21 @@ async function clickByName(session: WirSession, name: string): Promise<Record<st
 }
 
 interface Receipt {
-  attribution: string; windowMs: number; total: number;
-  requests: { atMs: number; type: string; method: string; url: string; status: number | null;
-    body?: { encoding: string; fields: Record<string, string>;
-      withheld?: { count: number; continuation: string } } }[];
+  attribution: string;
+  windowMs: number;
+  total: number;
+  requests: {
+    atMs: number;
+    type: string;
+    method: string;
+    url: string;
+    status: number | null;
+    body?: {
+      encoding: string;
+      fields: Record<string, string>;
+      withheld?: { count: number; continuation: string };
+    };
+  }[];
   withheld?: { count: number; estimated: boolean; unit: string; continuation: string };
 }
 
@@ -108,7 +133,7 @@ test('the act result names the POST the click caused, with its JSON fields and s
     const acted = await clickByName(session, 'Invite');
     const receipt = acted['receipt'] as Receipt;
     assert.equal(receipt.attribution, 'window', JSON.stringify(acted));
-    const post = receipt.requests.find(r => r.method === 'POST');
+    const post = receipt.requests.find((r) => r.method === 'POST');
     assert.ok(post, `the invite POST must be in the receipt: ${JSON.stringify(receipt)}`);
     assert.equal(post.url, `${url}api/v4/projects/183/invitations`);
     assert.ok(post.type === 'fetch' || post.type === 'xhr', post.type);
@@ -117,9 +142,14 @@ test('the act result names the POST the click caused, with its JSON fields and s
     assert.deepEqual(post.body?.fields, { format: 'json', access_level: '30', user_id: '2264' });
     // Ranking may order, never remove: the mutation is listed first, the reload after.
     assert.equal(receipt.requests[0]?.method, 'POST');
-    assert.ok(receipt.requests.some(r => r.type === 'document' && r.method === 'GET'),
-      `the reload the 201 triggered is part of the same window: ${JSON.stringify(receipt)}`);
-  } finally { await session.close(); close(); }
+    assert.ok(
+      receipt.requests.some((r) => r.type === 'document' && r.method === 'GET'),
+      `the reload the 201 triggered is part of the same window: ${JSON.stringify(receipt)}`,
+    );
+  } finally {
+    await session.close();
+    close();
+  }
 });
 
 test('a form submit shows its route, its 302, and redacts the password field', async () => {
@@ -128,15 +158,21 @@ test('a form submit shows its route, its 302, and redacts the password field', a
   try {
     const acted = await clickByName(session, 'Sign in');
     const receipt = acted['receipt'] as Receipt;
-    const post = receipt.requests.find(r => r.method === 'POST');
+    const post = receipt.requests.find((r) => r.method === 'POST');
     assert.ok(post, JSON.stringify(receipt));
     assert.equal(post.url, `${url}session`);
     assert.equal(post.type, 'document');
     assert.equal(post.status, 302);
     assert.equal(post.body?.encoding, 'form');
-    assert.deepEqual(post.body?.fields,
-      { 'login[username]': 'admin', 'login[password]': '[redacted]', form_key: 'k1' });
-  } finally { await session.close(); close(); }
+    assert.deepEqual(post.body?.fields, {
+      'login[username]': 'admin',
+      'login[password]': '[redacted]',
+      form_key: 'k1',
+    });
+  } finally {
+    await session.close();
+    close();
+  }
 });
 
 test('a click that sends nothing says so; the receipt is a bound with a continuation that reaches everything', async () => {
@@ -144,11 +180,13 @@ test('a click that sends nothing says so; the receipt is a bound with a continua
   const quietSession = await startSession(url);
   try {
     const quiet = await clickByName(quietSession, 'Toggle local panel');
-    const empty = (quiet['receipt'] as Receipt);
+    const empty = quiet['receipt'] as Receipt;
     assert.equal(empty.total, 0);
     assert.deepEqual(empty.requests, []);
     assert.equal(empty.withheld, undefined);
-  } finally { await quietSession.close(); }
+  } finally {
+    await quietSession.close();
+  }
   const session = await startSession(`${url}fanout`);
   try {
     const acted = await clickByName(session, 'Load many');
@@ -178,9 +216,12 @@ test('a click that sends nothing says so; the receipt is a bound with a continua
       call = JSON.parse(more.continuation) as Record<string, unknown>;
     }
     assert.equal(seen.length, 9);
-    assert.ok(seen.every(u => u.startsWith(`${url}item/`)));
+    assert.ok(seen.every((u) => u.startsWith(`${url}item/`)));
     const unknown = await session.dispatch({ verb: 'read', target: 'a_99' });
     assert.equal((unknown['rejected'] as { kind: string } | undefined)?.kind, 'unknown_ref');
     assert.equal(actRef, 'a_1');
-  } finally { await session.close(); close(); }
+  } finally {
+    await session.close();
+    close();
+  }
 });

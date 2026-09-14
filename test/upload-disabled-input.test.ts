@@ -36,8 +36,12 @@ async function refFor(session: WirSession, name: string): Promise<string> {
 
 async function uploadTo(session: WirSession, name: string): Promise<Record<string, unknown>> {
   const ref = await refFor(session, name);
-  return await session.dispatch({ verb: 'act', ref, action: 'upload', value: 'report.txt' }) as
-    Record<string, unknown>;
+  return (await session.dispatch({
+    verb: 'act',
+    ref,
+    action: 'upload',
+    value: 'report.txt',
+  })) as Record<string, unknown>;
 }
 
 test('a disabled file input rejects the upload instead of verifying it', async () => {
@@ -46,7 +50,10 @@ test('a disabled file input rejects the upload instead of verifying it', async (
   const uploads = mkdtempSync(join(tmpdir(), 'wir-upload-disabled-files-'));
   writeFileSync(join(uploads, 'report.txt'), 'proof\n');
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null, uploadDir: uploads,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
+    uploadDir: uploads,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
@@ -54,7 +61,10 @@ test('a disabled file input rejects the upload instead of verifying it', async (
     // The visible disabled input: the shared spine's disabled check owns this.
     const direct = await uploadTo(session, 'Attach report');
     const directRejected = direct['rejected'] as { kind: string; reason: string } | undefined;
-    assert.ok(directRejected, `expected a rejection, got ${JSON.stringify(direct['effect'] ?? direct)}`);
+    assert.ok(
+      directRejected,
+      `expected a rejection, got ${JSON.stringify(direct['effect'] ?? direct)}`,
+    );
     assert.equal(directRejected.kind, 'invalid_args');
     assert.match(directRejected.reason, /disabled/);
 
@@ -62,7 +72,10 @@ test('a disabled file input rejects the upload instead of verifying it', async (
     // the resolved-input check inside uploadFile owns it.
     const wrapped = await uploadTo(session, 'Wrapped disabled upload');
     const wrappedRejected = wrapped['rejected'] as { kind: string; reason: string } | undefined;
-    assert.ok(wrappedRejected, `expected a rejection, got ${JSON.stringify(wrapped['effect'] ?? wrapped)}`);
+    assert.ok(
+      wrappedRejected,
+      `expected a rejection, got ${JSON.stringify(wrapped['effect'] ?? wrapped)}`,
+    );
     assert.equal(wrappedRejected.kind, 'invalid_args');
     assert.match(wrappedRejected.reason, /disabled/);
 
@@ -70,7 +83,8 @@ test('a disabled file input rejects the upload instead of verifying it', async (
     // the same over-claim with different paperwork.
     const held = await session.host.page.evaluate(() => ({
       dis: (document.getElementById('dis') as HTMLInputElement | null)?.files?.length ?? -1,
-      wrapped: (document.querySelector('#wrapped input') as HTMLInputElement | null)?.files?.length ?? -1,
+      wrapped:
+        (document.querySelector('#wrapped input') as HTMLInputElement | null)?.files?.length ?? -1,
     }));
     assert.deepEqual(held, { dis: 0, wrapped: 0 });
 

@@ -39,8 +39,11 @@ const PAGE = `<!doctype html><title>select</title><main>
   <select aria-label="big picker">${MANY}</select>
   <div role="combobox" aria-label="scripted picker" tabindex="0">Choose…</div></main>`;
 
-async function rejectOf(session: WirSession, name: string, value: string):
-Promise<{ reason: string; repair: string }> {
+async function rejectOf(
+  session: WirSession,
+  name: string,
+  value: string,
+): Promise<{ reason: string; repair: string }> {
   const found = await session.dispatch({ verb: 'find', name });
   const ref = ((found['matches'] ?? []) as { ref: string }[])[0]?.ref;
   assert.ok(ref, `${name} not found: ${JSON.stringify(found)}`);
@@ -54,7 +57,9 @@ async function start(): Promise<WirSession> {
   const dir = mkdtempSync(join(tmpdir(), 'wir-select-'));
   writeFileSync(join(dir, 'a.html'), PAGE);
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   await session.goto(`file://${dir}/a.html`);
   return session;
@@ -65,13 +70,16 @@ test('a failed select names the options the page actually has', async () => {
   try {
     const { reason, repair } = await rejectOf(session, 'small picker', 'Nope');
     for (const opt of ['Alpha', 'Beta', 'Gamma']) {
-      assert.match(reason, new RegExp(opt),
-        `the rejection must list ${opt}: ${reason}`);
+      assert.match(reason, new RegExp(opt), `the rejection must list ${opt}: ${reason}`);
     }
     // And must not send the caller to a read that cannot return them.
-    assert.ok(!/"verb":"read"/.test(repair),
-      `a size=1 select's options have no box; that read is dead: ${repair}`);
-  } finally { await session.close(); }
+    assert.ok(
+      !/"verb":"read"/.test(repair),
+      `a size=1 select's options have no box; that read is dead: ${repair}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 test('a COLLAPSED long list declares the gap, because there is one', async () => {
@@ -79,11 +87,18 @@ test('a COLLAPSED long list declares the gap, because there is one', async () =>
   try {
     const { reason } = await rejectOf(session, 'big picker', 'Nope');
     assert.match(reason, /\+10 more of 40/, `the residual must be exact: ${reason}`);
-    assert.match(reason, /cannot\s+list the rest/,
-      `the absence of a continuation must be stated, not implied: ${reason}`);
-    assert.ok(!/"verb":"read"/.test(reason),
-      `no call may be offered that cannot reach them: ${reason}`);
-  } finally { await session.close(); }
+    assert.match(
+      reason,
+      /cannot\s+list the rest/,
+      `the absence of a continuation must be stated, not implied: ${reason}`,
+    );
+    assert.ok(
+      !/"verb":"read"/.test(reason),
+      `no call may be offered that cannot reach them: ${reason}`,
+    );
+  } finally {
+    await session.close();
+  }
 });
 
 // The first version of that message declared the gap for EVERY select, and the
@@ -94,17 +109,24 @@ test('a COLLAPSED long list declares the gap, because there is one', async () =>
 // is the same defect class as a false continuation, only quieter.
 test('a SIZED long list offers the read that reaches the rest', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wir-select-sized-'));
-  writeFileSync(join(dir, 'a.html'), `<!doctype html><title>sized</title>
-    <main><select aria-label="sized picker" size="4">${MANY}</select></main>`);
+  writeFileSync(
+    join(dir, 'a.html'),
+    `<!doctype html><title>sized</title>
+    <main><select aria-label="sized picker" size="4">${MANY}</select></main>`,
+  );
   const session = await WirSession.start({
-    headless: true, expectedAction: 'MUTATE', storageStatePath: null,
+    headless: true,
+    expectedAction: 'MUTATE',
+    storageStatePath: null,
   });
   try {
     await session.goto(`file://${dir}/a.html`);
     const { reason } = await rejectOf(session, 'sized picker', 'Nope');
     assert.match(reason, /\+10 more of 40/, reason);
-    assert.ok(!/cannot\s+list the rest/.test(reason),
-      `a sized select's options ARE reachable; declaring a gap is a false gap: ${reason}`);
+    assert.ok(
+      !/cannot\s+list the rest/.test(reason),
+      `a sized select's options ARE reachable; declaring a gap is a false gap: ${reason}`,
+    );
 
     // Follow the offered call. A continuation that does not deliver is the
     // dead-repair class this whole line of work exists to remove.
@@ -112,21 +134,26 @@ test('a SIZED long list offers the read that reaches the rest', async () => {
     assert.ok(m, `a reachable residual must carry its call: ${reason}`);
     const r = await session.dispatch(JSON.parse(m[1]!) as never);
     const kids = (r['children'] ?? []) as unknown[];
-    assert.equal(kids.length, 40,
-      `the offered read must return every option: ${kids.length}`);
-  } finally { await session.close(); }
+    assert.equal(kids.length, 40, `the offered read must return every option: ${kids.length}`);
+  } finally {
+    await session.close();
+  }
 });
 
 test('a scripted combobox is told it is not a select', async () => {
   const session = await start();
   try {
     const { reason, repair } = await rejectOf(session, 'scripted picker', 'Alpha');
-    assert.ok(!/no option matching/.test(reason),
-      `"no option matched" is false when there are no options: ${reason}`);
+    assert.ok(
+      !/no option matching/.test(reason),
+      `"no option matched" is false when there are no options: ${reason}`,
+    );
     assert.match(reason, /no <option> elements/, reason);
     // The repair must be an act it can actually perform.
     assert.match(repair, /"action":"click"/, repair);
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
 
 test('a matching select still succeeds', async () => {
@@ -141,5 +168,7 @@ test('a matching select still succeeds', async () => {
     const effect = r['effect'] as { verdict?: string; evidence?: string } | undefined;
     assert.equal(effect?.verdict, 'verified', JSON.stringify(r).slice(0, 300));
     assert.equal(effect?.evidence, 'option_selected', JSON.stringify(r).slice(0, 300));
-  } finally { await session.close(); }
+  } finally {
+    await session.close();
+  }
 });
